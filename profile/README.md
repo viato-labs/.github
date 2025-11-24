@@ -1,8 +1,8 @@
-# Valkari
+# Viato Labs
 
 ## About Us
 
-Valkari is a technology company dedicated to building intelligent and intuitive software that streamlines business processes. We specialize in leveraging artificial intelligence and automation to create powerful tools for content generation, sales, and business travel. Our mission is to empower businesses to operate more efficiently and effectively by providing them with the technological solutions they need to succeed in a competitive landscape.
+Viato Labs is a technology company dedicated to building intelligent and intuitive software that streamlines business processes. We specialize in leveraging artificial intelligence and automation to create powerful tools for content generation, sales, and business travel. Our mission is to empower businesses to operate more efficiently and effectively by providing them with the technological solutions they need to succeed in a competitive landscape.
 
 ## Our Products
 
