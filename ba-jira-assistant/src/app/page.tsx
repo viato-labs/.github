@@ -12,6 +12,7 @@ import type {
   PlaybookId,
   ResearchBundle,
   TicketDraft,
+  WorkflowTransition,
 } from "@/lib/types";
 
 type AuthStatus = {
@@ -67,6 +68,15 @@ export default function Home() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [editKey, setEditKey] = useState("");
   const [research, setResearch] = useState<ResearchBundle | null>(null);
+  const [moveAfterCreate, setMoveAfterCreate] = useState(true);
+  const [postCreateStatus, setPostCreateStatus] = useState("In Analysis");
+  const [transitionKey, setTransitionKey] = useState("");
+  const [availableTransitions, setAvailableTransitions] = useState<
+    WorkflowTransition[]
+  >([]);
+  const [currentStatus, setCurrentStatus] = useState("");
+  const [selectedTransitionId, setSelectedTransitionId] = useState("");
+  const [targetStatusShortcut, setTargetStatusShortcut] = useState("In Analysis");
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
@@ -76,6 +86,17 @@ export default function Home() {
   const signedIn = Boolean(
     authStatus?.oauthConnected || authStatus?.connection?.oauthConnected,
   );
+
+  function applyCompanyWorkflowDefaults(company?: CompanySummary | null) {
+    if (!company?.workflow) return;
+    const defaultStatus =
+      company.workflow.defaultPostCreateStatus ||
+      company.workflow.commonStatuses[0] ||
+      "In Analysis";
+    setPostCreateStatus(defaultStatus);
+    setTargetStatusShortcut(defaultStatus);
+    setMoveAfterCreate(Boolean(company.workflow.enablePostCreateTransition));
+  }
 
   async function refreshCompanies(preferredId?: string) {
     const response = await fetch("/api/companies");
@@ -123,6 +144,12 @@ export default function Home() {
       setPlaybookId(
         (companyData.company.playbooks?.[0]?.id as PlaybookId) || "single-brief",
       );
+      const companiesRes = await fetch("/api/companies");
+      const companiesData = await companiesRes.json();
+      const current = (companiesData.companies || []).find(
+        (c: CompanySummary) => c.id === companyId,
+      );
+      applyCompanyWorkflowDefaults(current);
     })();
   }, []);
 
@@ -170,6 +197,7 @@ export default function Home() {
       setPlaybookId(
         (company?.playbooks?.[0]?.id as PlaybookId) || "single-brief",
       );
+      applyCompanyWorkflowDefaults(company);
       setMessages([
         {
           id: uid(),
@@ -285,7 +313,11 @@ export default function Home() {
       const response = await fetch("/api/tickets/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, companyId: activeCompanyId }),
+        body: JSON.stringify({
+          draft,
+          companyId: activeCompanyId,
+          transitionToStatus: moveAfterCreate ? postCreateStatus : null,
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -293,18 +325,24 @@ export default function Home() {
         return;
       }
       const result = data.result;
+      const transitionNote = result.transition?.message
+        ? ` ${result.transition.message}`
+        : "";
       setLastResult(
-        `${result.dryRun ? "Dry-run" : "Created"} ${result.key} as you in ${data.company.name}`,
+        `${result.dryRun ? "Dry-run" : "Created"} ${result.key} as you in ${data.company.name}.${transitionNote}`,
       );
       setMessages((prev) => [
         ...prev,
         {
           id: uid(),
           role: "assistant",
-          content: `${result.dryRun ? "Dry-run ticket" : "Created Jira issue"} **${result.key}** in ${data.company.name}.`,
+          content: `${result.dryRun ? "Dry-run ticket" : "Created Jira issue"} **${result.key}** in ${data.company.name}.${
+            result.transition ? `\n${result.transition.message}` : ""
+          }`,
           createdAt: new Date().toISOString(),
         },
       ]);
+      if (result.key) setTransitionKey(result.key);
       setPreview(result.previewMarkdown || preview);
       await refreshCompanies(activeCompanyId);
     } catch {
@@ -359,6 +397,7 @@ export default function Home() {
         body: JSON.stringify({
           companyId: activeCompanyId,
           drafts: bulkDrafts,
+          transitionToStatus: moveAfterCreate ? postCreateStatus : null,
         }),
       });
       const data = await response.json();
@@ -368,21 +407,106 @@ export default function Home() {
       }
       const createdCount = data.results?.length || 0;
       const dryRun = data.results?.[0]?.dryRun;
+      const moved = (data.results || []).filter(
+        (r: { transition?: { dryRun?: boolean; toStatus?: string } }) =>
+          r.transition && !r.transition.dryRun,
+      ).length;
       setLastResult(
-        `${createdCount} ticket(s) ${dryRun ? "dry-run" : "created"} as you for ${data.company.name}`,
+        `${createdCount} ticket(s) ${dryRun ? "dry-run" : "created"} as you for ${data.company.name}${
+          moveAfterCreate ? ` · ${moved} moved toward ${postCreateStatus}` : ""
+        }`,
       );
       setMessages((prev) => [
         ...prev,
         {
           id: uid(),
           role: "assistant",
-          content: `Bulk ${dryRun ? "dry-run" : "create"} complete for **${data.company.name}**: ${createdCount} tickets.`,
+          content: `Bulk ${dryRun ? "dry-run" : "create"} complete for **${data.company.name}**: ${createdCount} tickets${
+            moveAfterCreate
+              ? `, with post-create status targeting **${postCreateStatus}** where the workflow allows it.`
+              : "."
+          }`,
           createdAt: new Date().toISOString(),
         },
       ]);
       await refreshCompanies(activeCompanyId);
     } catch {
       setLastResult("Bulk create failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadTransitions() {
+    if (!transitionKey.trim() || !activeCompanyId || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `/api/tickets/transitions?issueKey=${encodeURIComponent(transitionKey.trim())}&companyId=${encodeURIComponent(activeCompanyId)}`,
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setLastResult(data.error || "Could not load transitions");
+        return;
+      }
+      setAvailableTransitions(data.transitions || []);
+      setCurrentStatus(data.currentStatus || "");
+      setSelectedTransitionId(data.transitions?.[0]?.id || "");
+      setLastResult(
+        `${transitionKey.trim()} is in ${data.currentStatus || "unknown"}. ${data.transitions?.length || 0} transition(s) available.`,
+      );
+    } catch {
+      setLastResult("Could not load transitions");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyTransition(confirm: boolean) {
+    if (!transitionKey.trim() || !activeCompanyId || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/tickets/transitions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          issueKey: transitionKey.trim(),
+          targetStatus: targetStatusShortcut,
+          transitionId: confirm ? selectedTransitionId || undefined : undefined,
+          confirm,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setLastResult(data.error || "Transition failed");
+        return;
+      }
+      setAvailableTransitions(data.result?.availableTransitions || []);
+      setLastResult(data.result?.message || "Transition checked");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          content: data.result?.message || "Transition checked",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      if (confirm) {
+        // Refresh allowed transitions from the new status.
+        const refresh = await fetch(
+          `/api/tickets/transitions?issueKey=${encodeURIComponent(transitionKey.trim())}&companyId=${encodeURIComponent(activeCompanyId)}`,
+        );
+        const refreshData = await refresh.json();
+        if (refresh.ok) {
+          setAvailableTransitions(refreshData.transitions || []);
+          setCurrentStatus(refreshData.currentStatus || "");
+          setSelectedTransitionId(refreshData.transitions?.[0]?.id || "");
+        }
+      }
+    } catch {
+      setLastResult("Transition request failed");
     } finally {
       setBusy(false);
     }
@@ -658,6 +782,34 @@ export default function Home() {
                   : "Spreadsheets auto-run the selected bulk playbook"}
               </span>
             </div>
+            <div className="file-row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={moveAfterCreate}
+                  onChange={(e) => setMoveAfterCreate(e.target.checked)}
+                />{" "}
+                After create, move to
+              </label>
+              <select
+                value={postCreateStatus}
+                disabled={!moveAfterCreate}
+                onChange={(e) => setPostCreateStatus(e.target.value)}
+              >
+                {(
+                  activeCompany?.workflow.commonStatuses || [
+                    "In Analysis",
+                    "To Do",
+                    "In Progress",
+                    "In Review",
+                  ]
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="actions">
               <button
                 className="primary"
@@ -704,6 +856,65 @@ export default function Home() {
                 Update issue as me
               </button>
             </div>
+            <div className="file-row">
+              <input
+                placeholder="Issue key for status change (e.g. FIELD-45)"
+                value={transitionKey}
+                onChange={(e) => setTransitionKey(e.target.value)}
+              />
+              <button
+                disabled={busy || !transitionKey.trim() || !signedIn}
+                onClick={() => void loadTransitions()}
+              >
+                Load allowed statuses
+              </button>
+            </div>
+            {availableTransitions.length || currentStatus ? (
+              <div className="file-row">
+                <span>Current: {currentStatus || "unknown"}</span>
+                <select
+                  value={targetStatusShortcut}
+                  onChange={(e) => setTargetStatusShortcut(e.target.value)}
+                >
+                  {(activeCompany?.workflow.commonStatuses || []).map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedTransitionId}
+                  onChange={(e) => setSelectedTransitionId(e.target.value)}
+                >
+                  {availableTransitions.map((transition) => (
+                    <option key={transition.id} value={transition.id}>
+                      {transition.name} → {transition.toStatus}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  disabled={busy || !signedIn || !transitionKey.trim()}
+                  onClick={() => void applyTransition(false)}
+                >
+                  Preview move
+                </button>
+                <button
+                  className="primary"
+                  disabled={busy || !signedIn || !transitionKey.trim()}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Move ${transitionKey.trim()} toward "${targetStatusShortcut}" using only a Jira-allowed transition?`,
+                      )
+                    ) {
+                      void applyTransition(true);
+                    }
+                  }}
+                >
+                  Confirm status change
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
 

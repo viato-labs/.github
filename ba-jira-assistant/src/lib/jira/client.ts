@@ -9,6 +9,8 @@ import type {
   CreateTicketResult,
   JiraConnectionSecrets,
   TicketDraft,
+  TransitionResult,
+  WorkflowTransition,
 } from "@/lib/types";
 import {
   getCompany,
@@ -317,6 +319,164 @@ export async function updateIssueFromDraft(
   });
 
   return { key: issueKey, updated: true };
+}
+
+function normalizeStatusName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function statusAliases(target: string): string[] {
+  const normalized = normalizeStatusName(target);
+  const aliases = new Set<string>([normalized]);
+  if (normalized === "in analysis" || normalized === "analysis") {
+    aliases.add("in analysis");
+    aliases.add("analysis");
+    aliases.add("under analysis");
+  }
+  if (normalized === "in review" || normalized === "review") {
+    aliases.add("in review");
+    aliases.add("review");
+    aliases.add("code review");
+  }
+  if (normalized === "ready for dev" || normalized === "ready for development") {
+    aliases.add("ready for dev");
+    aliases.add("ready for development");
+  }
+  return [...aliases];
+}
+
+export async function getIssueStatus(
+  issueKey: string,
+  config: JiraConfig,
+): Promise<string | undefined> {
+  const issue = await jiraRequest<{
+    fields?: { status?: { name?: string } };
+  }>(config, `/rest/api/3/issue/${issueKey}?fields=status`);
+  return issue.fields?.status?.name;
+}
+
+export async function listIssueTransitions(
+  issueKey: string,
+  config?: JiraConfig,
+  companyIdOrSlug?: string,
+): Promise<{
+  key: string;
+  currentStatus?: string;
+  transitions: WorkflowTransition[];
+}> {
+  const resolved = config || (await getJiraConfigForCompany(companyIdOrSlug));
+  if (resolved.mode === "none") {
+    throw new Error("Sign in with Microsoft before reading workflow transitions.");
+  }
+
+  const data = await jiraRequest<{
+    transitions?: Array<{
+      id: string;
+      name: string;
+      to?: { id?: string; name?: string };
+    }>;
+  }>(resolved, `/rest/api/3/issue/${issueKey}/transitions`);
+
+  const currentStatus = await getIssueStatus(issueKey, resolved).catch(
+    () => undefined,
+  );
+
+  const transitions: WorkflowTransition[] = (data.transitions || []).map(
+    (transition) => ({
+      id: transition.id,
+      name: transition.name,
+      toStatus: transition.to?.name || transition.name,
+      toStatusId: transition.to?.id,
+    }),
+  );
+
+  return { key: issueKey, currentStatus, transitions };
+}
+
+export async function transitionIssueToStatus(input: {
+  issueKey: string;
+  targetStatus: string;
+  companyId?: string;
+  config?: JiraConfig;
+  confirm?: boolean;
+}): Promise<TransitionResult> {
+  const resolved =
+    input.config || (await getJiraConfigForCompany(input.companyId));
+  const listed = await listIssueTransitions(
+    input.issueKey,
+    resolved,
+    input.companyId,
+  );
+
+  const aliases = statusAliases(input.targetStatus);
+  const match = listed.transitions.find((transition) => {
+    const to = normalizeStatusName(transition.toStatus);
+    const name = normalizeStatusName(transition.name);
+    return aliases.some(
+      (alias) =>
+        to === alias ||
+        name === alias ||
+        to.includes(alias) ||
+        name.includes(alias),
+    );
+  });
+
+  if (!match) {
+    return {
+      key: input.issueKey,
+      dryRun: true,
+      fromStatus: listed.currentStatus,
+      toStatus: input.targetStatus,
+      availableTransitions: listed.transitions,
+      message: `No valid transition to "${input.targetStatus}" from ${listed.currentStatus || "current status"}. Available: ${
+        listed.transitions.map((t) => t.toStatus).join(", ") || "none"
+      }.`,
+    };
+  }
+
+  if (resolved.mode === "none" || resolved.dryRun) {
+    return {
+      key: input.issueKey,
+      dryRun: true,
+      fromStatus: listed.currentStatus,
+      toStatus: match.toStatus,
+      transitionId: match.id,
+      transitionName: match.name,
+      availableTransitions: listed.transitions,
+      message: `Dry-run: would transition ${input.issueKey} via "${match.name}" to ${match.toStatus}.`,
+    };
+  }
+
+  if (!input.confirm) {
+    return {
+      key: input.issueKey,
+      dryRun: true,
+      fromStatus: listed.currentStatus,
+      toStatus: match.toStatus,
+      transitionId: match.id,
+      transitionName: match.name,
+      availableTransitions: listed.transitions,
+      message: `Ready to transition ${input.issueKey} via "${match.name}" to ${match.toStatus}. Confirm to apply.`,
+    };
+  }
+
+  await jiraRequest(resolved, `/rest/api/3/issue/${input.issueKey}/transitions`, {
+    method: "POST",
+    body: JSON.stringify({
+      transition: { id: match.id },
+    }),
+  });
+
+  return {
+    key: input.issueKey,
+    dryRun: false,
+    fromStatus: listed.currentStatus,
+    toStatus: match.toStatus,
+    transitionId: match.id,
+    transitionName: match.name,
+    availableTransitions: listed.transitions,
+    message: `Moved ${input.issueKey} from ${listed.currentStatus || "previous status"} to ${match.toStatus}.`,
+  };
 }
 
 export async function harvestDorFromIssue(

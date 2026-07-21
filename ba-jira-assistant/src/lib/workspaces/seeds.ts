@@ -4,6 +4,7 @@ import type {
   ContextMemory,
   JiraConnectionPublic,
   Playbook,
+  WorkflowSettings,
 } from "@/lib/types";
 
 const SHARED_PLAYBOOKS: Playbook[] = [
@@ -32,6 +33,16 @@ function connectionStub(): JiraConnectionPublic {
     tokenConfigured: false,
     oauthConnected: false,
     dryRun: true,
+  };
+}
+
+function workflowSettings(
+  overrides: Partial<WorkflowSettings> = {},
+): WorkflowSettings {
+  return {
+    commonStatuses: ["To Do", "In Progress", "In Review", "Done"],
+    enablePostCreateTransition: false,
+    ...overrides,
   };
 }
 
@@ -112,6 +123,18 @@ export function seedChristies(): CompanyWorkspace {
         ],
       },
     ],
+    workflow: workflowSettings({
+      defaultPostCreateStatus: "In Analysis",
+      commonStatuses: [
+        "In Analysis",
+        "To Do",
+        "Ready for Dev",
+        "In Progress",
+        "In Review",
+        "Done",
+      ],
+      enablePostCreateTransition: true,
+    }),
     connection: connectionStub(),
     memory: baseMemory({
       defaultProjectKey: "FIELD",
@@ -182,6 +205,11 @@ export function seedMclaren(): CompanyWorkspace {
         rowBodyFields: ["notes", "description", "acceptance", "figma", "priority"],
       },
     ],
+    workflow: workflowSettings({
+      defaultPostCreateStatus: "To Do",
+      commonStatuses: ["To Do", "Design", "In Progress", "In Review", "Done"],
+      enablePostCreateTransition: false,
+    }),
     connection: connectionStub(),
     memory: baseMemory({
       defaultProjectKey: "CFG",
@@ -243,6 +271,7 @@ export function seedBlankCompany(name: string, slug: string): CompanyWorkspace {
       },
     ],
     playbooks: SHARED_PLAYBOOKS,
+    workflow: workflowSettings(),
     connection: connectionStub(),
     memory: baseMemory({
       defaultLabels: ["ba-assisted", slug],

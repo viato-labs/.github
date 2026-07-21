@@ -21,6 +21,7 @@
 | Multi-company accounts | **Ready** | Christie's + McLaren seeded; add more anytime |
 | Microsoft SSO login per company | **Ready (Path B)** | Sign in with Microsoft via Atlassian OAuth |
 | Create tickets once logged in | **Ready** | Create / bulk create / update by key |
+| Move status (e.g. In Analysis) | **Ready** | Uses only Jira-allowed transitions; Christie's defaults to post-create **In Analysis** |
 | Org-specific ticket format | **Ready to calibrate** | Template + per-company DoR/glossary/epics; you supply golden tickets to lock style |
 | Knowledge base of historical tickets | **Ready** | Grows automatically from search + your creates; per company |
 | Search Confluence + past Jira to learn | **Ready** | After Microsoft sign-in, each draft searches Jira + Confluence and stores hits |
@@ -42,7 +43,8 @@
 3. Playbook: **Engagement → SCO tickets (BAU)**  
 4. Upload filtered Excel/CSV  
 5. Review bulk queue  
-6. **Create all in Jira as me**
+6. Keep **After create, move to In Analysis** checked (Christie's default)  
+7. **Create all in Jira as me** — each ticket is created, then transitioned only if that status is valid in the workflow
 
 Replace seeded `BAU → EPIC-BAU` with the real BAU epic key in company memory when you have it.
 

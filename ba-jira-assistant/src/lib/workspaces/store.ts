@@ -56,6 +56,10 @@ function toSummary(company: CompanyWorkspace): CompanySummary {
     slug: company.slug,
     boards: company.boards,
     playbooks: company.playbooks,
+    workflow: company.workflow || {
+      commonStatuses: ["To Do", "In Progress", "In Review", "Done"],
+      enablePostCreateTransition: false,
+    },
     connection: company.connection,
     memoryStats: {
       briefs: company.memory.briefs.length,
@@ -137,8 +141,28 @@ async function readCompany(slug: string): Promise<CompanyWorkspace | null> {
   if (!memory.historicalTickets) memory.historicalTickets = [];
   const secrets = await loadSecrets(slug);
   const oauth = await loadOAuth(slug);
+  const workflow =
+    meta.workflow ||
+    (slug === "christies"
+      ? {
+          defaultPostCreateStatus: "In Analysis",
+          commonStatuses: [
+            "In Analysis",
+            "To Do",
+            "Ready for Dev",
+            "In Progress",
+            "In Review",
+            "Done",
+          ],
+          enablePostCreateTransition: true,
+        }
+      : {
+          commonStatuses: ["To Do", "In Progress", "In Review", "Done"],
+          enablePostCreateTransition: false,
+        });
   return {
     ...meta,
+    workflow,
     memory,
     connection: publicConnection(secrets, oauth, meta.connection),
   };
@@ -256,12 +280,15 @@ export async function saveCompanyMemory(
 
 export async function updateCompanyMeta(
   companyIdOrSlug: string,
-  patch: Partial<Pick<CompanyWorkspace, "name" | "boards" | "playbooks">>,
+  patch: Partial<
+    Pick<CompanyWorkspace, "name" | "boards" | "playbooks" | "workflow">
+  >,
 ) {
   const company = await getCompany(companyIdOrSlug);
   if (patch.name) company.name = patch.name;
   if (patch.boards) company.boards = patch.boards;
   if (patch.playbooks) company.playbooks = patch.playbooks;
+  if (patch.workflow) company.workflow = patch.workflow;
   await persistCompany(company);
   return toSummary(company);
 }

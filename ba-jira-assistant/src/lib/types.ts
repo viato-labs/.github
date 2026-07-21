@@ -190,6 +190,33 @@ export type ContextMemory = {
   }>;
 };
 
+export type WorkflowSettings = {
+  /** Preferred status after create (matched against available transitions). */
+  defaultPostCreateStatus?: string;
+  /** Status names commonly used in this company (for UI shortcuts). */
+  commonStatuses: string[];
+  /** If true, create flow may auto-transition when requested/defaulted. */
+  enablePostCreateTransition: boolean;
+};
+
+export type WorkflowTransition = {
+  id: string;
+  name: string;
+  toStatus: string;
+  toStatusId?: string;
+};
+
+export type TransitionResult = {
+  key: string;
+  dryRun: boolean;
+  fromStatus?: string;
+  toStatus: string;
+  transitionId?: string;
+  transitionName?: string;
+  availableTransitions: WorkflowTransition[];
+  message: string;
+};
+
 export type CompanyWorkspace = {
   id: string;
   name: string;
@@ -198,6 +225,7 @@ export type CompanyWorkspace = {
   updatedAt: string;
   boards: BoardTarget[];
   playbooks: Playbook[];
+  workflow: WorkflowSettings;
   connection: JiraConnectionPublic;
   memory: ContextMemory;
 };
@@ -208,6 +236,7 @@ export type CompanySummary = {
   slug: string;
   boards: BoardTarget[];
   playbooks: Playbook[];
+  workflow: WorkflowSettings;
   connection: JiraConnectionPublic;
   memoryStats: {
     briefs: number;
@@ -236,6 +265,7 @@ export type CreateTicketResult = {
   payload: unknown;
   warnings: string[];
   companyId: string;
+  transition?: TransitionResult;
 };
 
 export type BulkDraftResult = {
