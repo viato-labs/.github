@@ -32,13 +32,17 @@
   ],
   "host_permissions": [
     "https://*.atlassian.net/*",
-    "https://*.jira.com/*"
+    "https://*.jira.com/*",
+    "https://jira.task.mclaren.com/*",
+    "https://christiestech.atlassian.net/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://*.atlassian.net/*",
-        "https://*.jira.com/*"
+        "https://*.jira.com/*",
+        "https://jira.task.mclaren.com/*",
+        "https://christiestech.atlassian.net/*"
       ],
       "js": ["content/jira-bridge.js"],
       "run_at": "document_idle"

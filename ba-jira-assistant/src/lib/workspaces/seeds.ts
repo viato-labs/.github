@@ -26,9 +26,15 @@ const SHARED_PLAYBOOKS: Playbook[] = [
   },
 ];
 
-function connectionStub(): JiraConnectionPublic {
+/** Known company Jira homes (from BA-provided browse URLs). */
+export const KNOWN_JIRA_HOMES: Record<string, string> = {
+  christies: "https://christiestech.atlassian.net",
+  mclaren: "https://jira.task.mclaren.com",
+};
+
+function connectionStub(baseUrl = ""): JiraConnectionPublic {
   return {
-    baseUrl: "",
+    baseUrl,
     email: "",
     tokenConfigured: false,
     oauthConnected: false,
@@ -80,11 +86,11 @@ export function seedChristies(): CompanyWorkspace {
     updatedAt: now,
     boards: [
       {
-        id: "board_web",
-        name: "Web Delivery",
-        projectKey: "WEB",
+        id: "board_engs",
+        name: "Engineering",
+        projectKey: "ENGS",
         defaultIssueType: "Story",
-        notes: "Primary digital delivery board",
+        notes: "Primary engineering board (e.g. ENGS-19826)",
       },
       {
         id: "board_field",
@@ -135,10 +141,10 @@ export function seedChristies(): CompanyWorkspace {
       ],
       enablePostCreateTransition: true,
     }),
-    connection: connectionStub(),
+    connection: connectionStub(KNOWN_JIRA_HOMES.christies),
     memory: baseMemory({
-      defaultProjectKey: "FIELD",
-      defaultLabels: ["ba-assisted", "christies", "sco"],
+      defaultProjectKey: "ENGS",
+      defaultLabels: ["ba-assisted", "christies"],
       productGlossary: {
         lot: "An auction item available for bidding or purchase",
         "my lots": "Signed-in collector area for saved / followed lots",
@@ -158,11 +164,13 @@ export function seedChristies(): CompanyWorkspace {
       sections: ["Search", "Lot page", "My Lots", "Checkout", "Account"],
       historicalTickets: [
         {
-          key: "WEB-1001",
-          summary: "Save lot from search results",
+          key: "ENGS-19826",
+          summary: "Christie's engineering reference ticket",
           intent: "feature-story",
-          section: "Search",
-          notes: "Golden style reference for feature stories",
+          section: "Engineering",
+          notes:
+            "Style/format reference from https://christiestech.atlassian.net/browse/ENGS-19826",
+          source: "seed",
           capturedAt: now,
         },
       ],
@@ -180,17 +188,18 @@ export function seedMclaren(): CompanyWorkspace {
     updatedAt: now,
     boards: [
       {
+        id: "board_dvc",
+        name: "DVC",
+        projectKey: "DVC",
+        defaultIssueType: "Story",
+        notes: "Primary delivery board (e.g. DVC-1128)",
+      },
+      {
         id: "board_config",
         name: "Configurator",
         projectKey: "CFG",
         defaultIssueType: "Story",
         notes: "Vehicle configurator design + build",
-      },
-      {
-        id: "board_design",
-        name: "Design System",
-        projectKey: "DSN",
-        defaultIssueType: "Task",
       },
     ],
     playbooks: [
@@ -210,11 +219,11 @@ export function seedMclaren(): CompanyWorkspace {
       commonStatuses: ["To Do", "Design", "In Progress", "In Review", "Done"],
       enablePostCreateTransition: false,
     }),
-    connection: connectionStub(),
+    connection: connectionStub(KNOWN_JIRA_HOMES.mclaren),
     memory: baseMemory({
-      defaultProjectKey: "CFG",
+      defaultProjectKey: "DVC",
       defaultIssueType: "Story",
-      defaultLabels: ["ba-assisted", "mclaren", "configurator"],
+      defaultLabels: ["ba-assisted", "mclaren"],
       productGlossary: {
         configurator: "Client vehicle configuration experience",
         exterior: "Exterior design and finish choices",
@@ -239,14 +248,17 @@ export function seedMclaren(): CompanyWorkspace {
         "Design tickets describe visual/interaction intent, not implementation.",
         "Reference existing configurator section patterns and prior design tickets.",
         "Keep McLaren vocabulary; never mix Christie's auction language.",
+        "McLaren Jira is on jira.task.mclaren.com (session / Chrome agent preferred).",
       ],
       historicalTickets: [
         {
-          key: "DSN-220",
-          summary: "[Design] Exterior colour swatch interaction",
-          intent: "design",
-          section: "Exterior",
-          notes: "Reference for design ticket depth and tone",
+          key: "DVC-1128",
+          summary: "McLaren delivery reference ticket",
+          intent: "feature-story",
+          section: "DVC",
+          notes:
+            "Style/format reference from https://jira.task.mclaren.com/browse/DVC-1128",
+          source: "seed",
           capturedAt: now,
         },
       ],

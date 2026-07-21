@@ -29,14 +29,16 @@ Nothing in Christie's memory is used while drafting for McLaren, and vice versa.
 ## Seeded companies
 
 ### Christie's
-- Boards: `WEB`, `FIELD`
+- Jira: `https://christiestech.atlassian.net` (ref: [ENGS-19826](https://christiestech.atlassian.net/browse/ENGS-19826))
+- Boards: `ENGS`, `FIELD`
 - Playbook: `field-trip-by-engagement` — Excel/CSV row → field/engagement ticket
 - Domain glossary + historical feature-story references
 
 ### McLaren
-- Boards: `CFG`, `DSN`
+- Jira: `https://jira.task.mclaren.com` (ref: [DVC-1128](https://jira.task.mclaren.com/browse/DVC-1128))
+- Boards: `DVC`, `CFG`
 - Playbook: `configurator-design-sections` — design ticket per configurator section (from knowledge and/or spreadsheet)
-- Configurator vocabulary + design ticket references
+- Prefer Chrome agent / logged-in session (self-hosted Jira, not Atlassian Cloud OAuth)
 
 Add more companies from the UI (“Add company workspace”) or `POST /api/companies`.
 

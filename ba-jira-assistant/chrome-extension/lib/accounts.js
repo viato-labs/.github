@@ -5,25 +5,27 @@ export const SEED_ACCOUNTS = [
     id: "christies",
     name: "Christie's",
     slug: "christies",
-    jiraUrl: "",
-    hostHints: ["christies", "chr"],
-    defaultProjectKey: "BAU",
+    jiraUrl: "https://christiestech.atlassian.net",
+    hostHints: ["christiestech", "christies", "chr"],
+    defaultProjectKey: "ENGS",
     defaultEpicKey: "BAU",
     defaultPostCreateStatus: "In Analysis",
-    summaryPrefix: "[SCO] ",
+    summaryPrefix: "",
     color: "#6554C0",
+    referenceTicket: "ENGS-19826",
   },
   {
     id: "mclaren",
     name: "McLaren",
     slug: "mclaren",
-    jiraUrl: "",
-    hostHints: ["mclaren", "mcl"],
-    defaultProjectKey: "CFG",
+    jiraUrl: "https://jira.task.mclaren.com",
+    hostHints: ["jira.task.mclaren.com", "mclaren", "mcl", "task.mclaren"],
+    defaultProjectKey: "DVC",
     defaultEpicKey: "Configurator",
     defaultPostCreateStatus: "To Do",
     summaryPrefix: "",
     color: "#0B5FFF",
+    referenceTicket: "DVC-1128",
   },
 ];
 
@@ -64,9 +66,22 @@ export async function loadAccounts() {
       color: account.color || colorFor(account.slug || account.id),
       jiraUrl: account.jiraUrl || "",
     };
-    // Prefer custom overrides for seed ids (e.g. saved Jira URL)
+    // Prefer custom overrides for seed ids, but keep seed Jira URL if custom is empty
     const existingCustom = custom.find((c) => c.id === merged.id);
-    byId.set(merged.id, existingCustom ? { ...merged, ...existingCustom, color: existingCustom.color || merged.color } : merged);
+    byId.set(
+      merged.id,
+      existingCustom
+        ? {
+            ...merged,
+            ...existingCustom,
+            color: existingCustom.color || merged.color,
+            jiraUrl: existingCustom.jiraUrl || merged.jiraUrl || "",
+            hostHints: existingCustom.hostHints?.length
+              ? existingCustom.hostHints
+              : merged.hostHints,
+          }
+        : merged,
+    );
   }
   // Re-add custom-only
   for (const account of custom) {

@@ -9,7 +9,11 @@ import type {
   JiraConnectionPublic,
   JiraConnectionSecrets,
 } from "@/lib/types";
-import { DEFAULT_SEEDS, seedBlankCompany } from "@/lib/workspaces/seeds";
+import {
+  DEFAULT_SEEDS,
+  KNOWN_JIRA_HOMES,
+  seedBlankCompany,
+} from "@/lib/workspaces/seeds";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const WORKSPACES_DIR = path.join(DATA_DIR, "workspaces");
@@ -101,10 +105,15 @@ function publicConnection(
   fallback?: JiraConnectionPublic,
 ): JiraConnectionPublic {
   const oauthConnected = Boolean(oauth?.accessToken && oauth?.cloudId);
+  const baseUrl =
+    oauth?.siteUrl ||
+    secrets?.baseUrl ||
+    fallback?.baseUrl ||
+    "";
   if (!secrets && !oauthConnected) {
     return (
       fallback || {
-        baseUrl: "",
+        baseUrl,
         email: "",
         tokenConfigured: false,
         oauthConnected: false,
@@ -113,7 +122,7 @@ function publicConnection(
     );
   }
   return {
-    baseUrl: oauth?.siteUrl || secrets?.baseUrl || "",
+    baseUrl,
     email: oauth?.accountEmail || secrets?.email || "",
     tokenConfigured: Boolean(secrets?.apiToken),
     oauthConnected,
@@ -168,10 +177,38 @@ async function readCompany(slug: string): Promise<CompanyWorkspace | null> {
   };
 }
 
+/** Backfill known Jira homes onto existing workspaces that still have an empty URL. */
+async function ensureKnownJiraHomes(index: WorkspaceIndex) {
+  for (const entry of index.companies) {
+    const known = KNOWN_JIRA_HOMES[entry.slug];
+    if (!known) continue;
+    const meta = await readJson<Omit<CompanyWorkspace, "memory">>(
+      metaPath(entry.slug),
+    );
+    if (!meta) continue;
+    const current = meta.connection?.baseUrl?.replace(/\/$/, "") || "";
+    if (current) continue;
+    meta.connection = {
+      ...(meta.connection || {
+        email: "",
+        tokenConfigured: false,
+        oauthConnected: false,
+        dryRun: true,
+      }),
+      baseUrl: known,
+    };
+    meta.updatedAt = new Date().toISOString();
+    await writeJson(metaPath(entry.slug), meta);
+  }
+}
+
 async function bootstrapIfNeeded() {
   await ensureDirs();
   const index = await readJson<WorkspaceIndex>(INDEX_PATH);
-  if (index?.companies?.length) return index;
+  if (index?.companies?.length) {
+    await ensureKnownJiraHomes(index);
+    return index;
+  }
 
   // Migrate legacy single-memory file into Christie's if present.
   const legacy = await readJson<ContextMemory>(LEGACY_MEMORY_PATH);

@@ -551,7 +551,7 @@ export default function Home() {
                 <input
                   value={jiraUrlDraft}
                   onChange={(e) => setJiraUrlDraft(e.target.value)}
-                  placeholder="https://christies.atlassian.net"
+                    placeholder="https://christiestech.atlassian.net"
                 />
               </label>
               <label className="field">
