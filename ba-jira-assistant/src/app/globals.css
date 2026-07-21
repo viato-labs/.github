@@ -1,0 +1,259 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #14231f;
+  --ink-soft: #2c4038;
+  --mist: #e7eef0;
+  --panel: rgba(255, 252, 247, 0.82);
+  --line: rgba(20, 35, 31, 0.12);
+  --accent: #0f6a5a;
+  --accent-deep: #0a453b;
+  --warn: #8a5a12;
+  --ok: #1f6b3a;
+  --background: #d9e4e6;
+  --foreground: var(--ink);
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(15, 106, 90, 0.18), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(36, 72, 96, 0.16), transparent 50%),
+    linear-gradient(165deg, #d5e2e5 0%, #edf1ee 45%, #dfe8e4 100%);
+}
+
+a {
+  color: inherit;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.5rem 0 3rem;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 560;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.lede {
+  margin: 0.75rem 0 0;
+  max-width: 42rem;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.chip[data-tone="ok"] {
+  color: var(--ok);
+  border-color: rgba(31, 107, 58, 0.28);
+}
+
+.chip[data-tone="warn"] {
+  color: var(--warn);
+  border-color: rgba(138, 90, 18, 0.28);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  min-height: 28rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.chat-log {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 28rem;
+}
+
+.bubble {
+  max-width: 92%;
+  padding: 0.75rem 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  animation: rise 280ms ease-out;
+}
+
+.bubble[data-role="user"] {
+  align-self: flex-end;
+  background: rgba(15, 106, 90, 0.12);
+  border: 1px solid rgba(15, 106, 90, 0.22);
+}
+
+.bubble[data-role="assistant"] {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+textarea {
+  width: 100%;
+  min-height: 7.5rem;
+  resize: vertical;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.75rem;
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 106, 90, 0.45);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent-deep);
+  color: #f4fffb;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.preview {
+  padding: 1rem;
+  overflow: auto;
+  max-height: 34rem;
+}
+
+.preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.side-meta {
+  padding: 0 1rem 1rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.file-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hint {
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  max-width: 48rem;
+}
