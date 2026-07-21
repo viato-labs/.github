@@ -1,21 +1,28 @@
 import { NextResponse } from "next/server";
-import { loadMemory } from "@/lib/context-store";
-import { buildTicketDraft } from "@/lib/intake";
+import { draftFromBriefForCompany } from "@/lib/playbooks/run";
 import { draftToMarkdown } from "@/lib/templates/ticket-body";
-import type { TicketDraft } from "@/lib/types";
+import type { PlaybookId, TicketDraft } from "@/lib/types";
+import { getCompany } from "@/lib/workspaces/store";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
     message?: string;
     draft?: TicketDraft;
     files?: string[];
+    companyId?: string;
+    playbookId?: PlaybookId;
   };
 
-  const memory = await loadMemory();
+  const company = await getCompany(body.companyId || body.draft?.companyId);
   const draft =
     body.draft ||
     (body.message
-      ? buildTicketDraft(body.message, memory, { files: body.files })
+      ? draftFromBriefForCompany(
+          company,
+          body.message,
+          body.files,
+          body.playbookId || "single-brief",
+        )
       : null);
 
   if (!draft) {
@@ -26,6 +33,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
+    company: { id: company.id, name: company.name },
     draft,
     markdown: draftToMarkdown(draft),
   });

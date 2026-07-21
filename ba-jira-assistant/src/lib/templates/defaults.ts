@@ -109,4 +109,16 @@ export const INTENT_META: Record<
     defaultLabels: ["ba", "qa"],
     requireGherkin: true,
   },
+  design: {
+    label: "Design",
+    summaryPrefix: "[Design]",
+    defaultLabels: ["ba", "design"],
+    requireGherkin: false,
+  },
+  "field-ops": {
+    label: "Field ops",
+    summaryPrefix: "[Field]",
+    defaultLabels: ["ba", "field-ops"],
+    requireGherkin: false,
+  },
 };

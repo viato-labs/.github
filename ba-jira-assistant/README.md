@@ -1,16 +1,17 @@
 # BA Jira Assistant
 
-Chat-driven helper that turns a short BA brief into a consistent Jira ticket body:
+Multi-company, chat-driven helper that turns a short BA brief (or Excel/CSV) into consistent Jira tickets:
 
 1. **Product Overview**
 2. **Description** (clear instructions for developers)
 3. **Technical Information** (blank outline for developers)
-4. **QA Acceptance Criteria** in **Gherkin** (`Given` / `When` / `Then`)
-5. **Definition of Ready** table (copied from house standard / golden ticket)
+4. **QA Acceptance Criteria** in **Gherkin** (`Given` / `When` / `Then`) when relevant
+5. **Definition of Ready** table (company house standard)
 
-It also keeps a local **context memory** (epics, glossary, DoR, past briefs) so later tickets stay consistent with less typing.
+Each company workspace (Christie's, McLaren, …) stores its own Jira login, boards, glossary, epics, DoR, and history — no cross-client bleed.
 
-> Investigation notes: [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md)
+> Investigation: [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md)  
+> Multi-company model: [`docs/MULTI_COMPANY.md`](./docs/MULTI_COMPANY.md)
 
 ## Quick start
 
@@ -23,33 +24,39 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Without Jira credentials the app runs in **dry-run** mode and still drafts full ticket previews.
+Without credentials the app stays in **dry-run** and still drafts full previews.
 
-## Connect Jira (safe auth)
+## Multi-company usage
 
-1. Create an Atlassian **API token** (not your password):  
-   https://id.atlassian.com/manage-profile/security/api-tokens
-2. Put values in `.env.local`:
+1. Switch company in the header (seeded: **Christie's**, **McLaren**)
+2. Optionally add that company's Jira API token login
+3. Choose a playbook:
+   - `single-brief` — one chat brief → one ticket
+   - `bulk-rows` — each spreadsheet row → one ticket
+   - `field-trip-by-engagement` — Christie's engagement sheet → field tickets
+   - `configurator-design-sections` — McLaren design tickets per section
+4. Paste a brief **or** upload Excel/CSV
+5. Review confidence + preview → create
 
-```env
-JIRA_BASE_URL=https://your-domain.atlassian.net
-JIRA_EMAIL=you@company.com
-JIRA_API_TOKEN=...
-JIRA_DEFAULT_PROJECT=PROJ
-JIRA_DEFAULT_ISSUE_TYPE=Story
-JIRA_DRY_RUN=false
+## Connect Jira (per company)
+
+Prefer the UI login panel. Or `POST /api/companies/credentials` with:
+
+```json
+{
+  "companyId": "company_christies",
+  "baseUrl": "https://your-domain.atlassian.net",
+  "email": "you@company.com",
+  "apiToken": "...",
+  "dryRun": true
+}
 ```
 
-3. Restart `npm run dev`
-4. Optional: harvest DoR from a golden ticket:
+Tokens are stored under `.data/workspaces/<slug>/secrets.json` (gitignored).
 
-```bash
-curl -X POST http://localhost:3000/api/tickets/harvest-dor \
-  -H 'content-type: application/json' \
-  -d '{"issueKey":"PROJ-123"}'
-```
+## Example briefs
 
-## Example brief
+Christie's:
 
 ```text
 Buyers need to save a lot from search results on web.
@@ -58,20 +65,29 @@ Priority: High
 Users can save and see it in My Lots.
 ```
 
+McLaren knowledge bulk:
+
+1. Select McLaren
+2. Playbook: Configurator design sections
+3. Click **Draft design tickets from knowledge**
+
 ## API surface
 
 | Route | Purpose |
 |---|---|
-| `POST /api/chat` | Store brief context + draft ticket |
+| `GET/POST/PATCH /api/companies` | List / add / switch company |
+| `POST /api/companies/credentials` | Save per-company Jira login |
+| `POST /api/chat` | Store brief + draft ticket |
 | `POST /api/tickets/preview` | Markdown preview |
-| `POST /api/tickets/create` | Create issue (or dry-run) |
+| `POST /api/tickets/create` | Create one or many drafts |
+| `POST /api/tickets/bulk` | Spreadsheet / knowledge playbooks |
 | `POST /api/tickets/harvest-dor` | Pull DoR table from a golden ticket |
-| `GET/PATCH /api/context` | Read/update epic map, glossary, DoR |
+| `GET/PATCH /api/context` | Company memory updates |
 | `GET /api/jira/status` | Connection / dry-run status |
 
 ## Important constraints
 
-- Prefer API token / OAuth / service account — not SSO password sharing.
-- Company-managed Jira may need Epic Link `customfield_#####` calibration after first live create attempt.
-- Required create-screen fields vary by project; map them once from `createmeta`.
-- For Cursor-native create/search, Atlassian Rovo MCP is an option; prefer org-approved / Runlayer-managed MCP configuration over ad-hoc shadow MCPs.
+- One login + knowledge base per company — never mix client standards
+- Prefer API token / OAuth / service account — not SSO password sharing
+- Company-managed Jira may need Epic Link `customfield_#####` calibration
+- For Cursor-native create/search, prefer org-approved / Runlayer-managed MCP over ad-hoc shadow MCPs

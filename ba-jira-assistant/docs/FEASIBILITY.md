@@ -2,9 +2,11 @@
 
 ## Verdict
 
-**Yes — this is feasible**, and for a Christie's-style BA workflow it is a strong fit, with one important caveat: you should **not** hand an AI agent a normal username/password login. Use an **API token**, **OAuth**, or a **service account**. With that access, a chat-style app can turn minimal BA input into consistently structured tickets (product overview, description, Gherkin QA, developer technical stub, and a copied Definition of Ready table) and create them in Jira with high fidelity.
+**Yes — this is feasible**, and for a multi-client BA workflow (Christie's, McLaren, and others) it is a strong fit, with one important caveat: you should **not** hand an AI agent a normal username/password login. Use an **API token**, **OAuth**, or a **service account** **per company**. With that access, a chat-style app can turn minimal BA input (or an Excel dump) into consistently structured tickets and create them on the right boards with high fidelity.
 
 Assuming “kirkin format” means **Gherkin** (`Given` / `When` / `Then`) for QA acceptance criteria.
+
+**Multi-company isolation is required for authenticity.** Each company keeps its own login, boards, DoR, glossary, epic map, historical ticket references, and created-ticket log. See [`MULTI_COMPANY.md`](./MULTI_COMPANY.md).
 
 ---
 
@@ -225,17 +227,34 @@ The software side is straightforward. The main uncertainty is **Christie's Jira 
 
 ---
 
+## Near-autonomous target state
+
+The product objective is supervision-light creation:
+
+1. You choose company + playbook
+2. You give key parameters **or** upload files (Excel/CSV/notes)
+3. The system uses **that company's** historical tickets + knowledge base to write authentic BA-standard tickets
+4. You only intervene for low-confidence drafts or novel work types
+
+Examples already modelled:
+
+- **Christie's:** spreadsheet of engagements → `field-trip-by-engagement` → one ticket per row on the field board
+- **McLaren:** configurator sections already in knowledge (or a sheet) → `configurator-design-sections` → one design ticket per section
+
 ## What we need from you to go from prototype → production fidelity
+
+Per company:
 
 1. **Jira site URL** (Cloud `*.atlassian.net` or DC base URL)
 2. **Auth**: API token for a BA-capable account (or OAuth app + consent) — not a password
 3. **1–3 golden tickets** that represent the house standard (keys are enough if readable)
-4. **Target project key(s)** and default issue type
+4. **Target project/board key(s)** and default issue type
 5. **Epic list** or naming convention
 6. Confirmation whether DoR is always in the description (vs custom field)
 7. Any required fields that block create (screenshots of the create form help)
+8. Sample bulk files for recurring playbooks (field trips, design sections, etc.)
 
-With those, the assistant can lock the template and create tickets that look like they came from a standard BA user.
+With those, the assistant can lock each company's template and create tickets that look like they came from a standard BA user for that organisation.
 
 ---
 

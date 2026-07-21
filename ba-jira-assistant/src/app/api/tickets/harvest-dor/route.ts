@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { replaceDefinitionOfReady } from "@/lib/context-store";
-import { getJiraConfig, harvestDorFromIssue } from "@/lib/jira/client";
+import { harvestDorFromIssue } from "@/lib/jira/client";
+import { getCompany, replaceDefinitionOfReady } from "@/lib/workspaces/store";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { issueKey?: string };
+  const body = (await request.json()) as {
+    issueKey?: string;
+    companyId?: string;
+  };
+  const company = await getCompany(body.companyId);
   const issueKey = body.issueKey || process.env.JIRA_GOLDEN_TICKET_KEY;
 
   if (!issueKey) {
@@ -14,12 +18,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const config = getJiraConfig();
-    const harvested = await harvestDorFromIssue(issueKey, config);
+    const harvested = await harvestDorFromIssue(issueKey, undefined, company.id);
     if (harvested.rows.length) {
-      await replaceDefinitionOfReady(harvested.rows);
+      await replaceDefinitionOfReady(company.id, harvested.rows);
     }
-    return NextResponse.json(harvested);
+    return NextResponse.json({
+      company: { id: company.id, name: company.name },
+      ...harvested,
+    });
   } catch (error) {
     return NextResponse.json(
       {

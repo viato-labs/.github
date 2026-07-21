@@ -1,5 +1,6 @@
 import { draftToAdf } from "@/lib/templates/ticket-body";
-import type { CreateTicketResult, TicketDraft } from "@/lib/types";
+import type { CreateTicketResult, JiraConnectionSecrets, TicketDraft } from "@/lib/types";
+import { getCompanySecrets } from "@/lib/workspaces/store";
 
 export type JiraConfig = {
   baseUrl: string;
@@ -8,13 +9,13 @@ export type JiraConfig = {
   dryRun: boolean;
 };
 
-export function getJiraConfig(): JiraConfig {
+/** Fallback env credentials (single-tenant). Prefer per-company secrets. */
+export function getEnvJiraConfig(): JiraConfig {
   const baseUrl = (process.env.JIRA_BASE_URL || "").replace(/\/$/, "");
   const email = process.env.JIRA_EMAIL || "";
   const apiToken = process.env.JIRA_API_TOKEN || "";
   const dryRunEnv = process.env.JIRA_DRY_RUN;
   const hasCreds = Boolean(baseUrl && email && apiToken);
-  // Live creates only when credentials exist AND dry-run is explicitly disabled.
   const live = hasCreds && (dryRunEnv === "false" || dryRunEnv === "0");
 
   return {
@@ -23,6 +24,27 @@ export function getJiraConfig(): JiraConfig {
     apiToken,
     dryRun: !live,
   };
+}
+
+export async function getJiraConfigForCompany(
+  companyIdOrSlug?: string,
+): Promise<JiraConfig> {
+  const secrets = await getCompanySecrets(companyIdOrSlug);
+  if (secrets?.baseUrl && secrets.email && secrets.apiToken) {
+    const live = !secrets.dryRun;
+    return {
+      baseUrl: secrets.baseUrl.replace(/\/$/, ""),
+      email: secrets.email,
+      apiToken: secrets.apiToken,
+      dryRun: !live,
+    };
+  }
+  return getEnvJiraConfig();
+}
+
+/** @deprecated use getJiraConfigForCompany */
+export function getJiraConfig(): JiraConfig {
+  return getEnvJiraConfig();
 }
 
 function authHeader(config: JiraConfig): string {
@@ -54,13 +76,13 @@ export async function jiraRequest<T>(
   return (await response.json()) as T;
 }
 
-export async function probeJira(config: JiraConfig) {
+export async function probeJira(config: JiraConfig, companyName?: string) {
+  const label = companyName ? `${companyName}: ` : "";
   if (!config.baseUrl || !config.email || !config.apiToken) {
     return {
       ok: false,
       dryRun: true,
-      message:
-        "No Jira credentials configured. Running in dry-run mode. Set JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN and JIRA_DRY_RUN=false for live creates.",
+      message: `${label}No Jira credentials configured. Dry-run only. Add a company login (API token) to create live tickets.`,
     };
   }
 
@@ -73,15 +95,15 @@ export async function probeJira(config: JiraConfig) {
       ok: true,
       dryRun: config.dryRun,
       message: config.dryRun
-        ? `Connected as ${me.displayName || me.emailAddress}, but dry-run is enabled.`
-        : `Connected as ${me.displayName || me.emailAddress}. Live creates enabled.`,
+        ? `${label}Connected as ${me.displayName || me.emailAddress}, dry-run enabled.`
+        : `${label}Connected as ${me.displayName || me.emailAddress}. Live creates enabled.`,
       user: me,
     };
   } catch (error) {
     return {
       ok: false,
       dryRun: true,
-      message: error instanceof Error ? error.message : "Jira probe failed",
+      message: `${label}${error instanceof Error ? error.message : "Jira probe failed"}`,
     };
   }
 }
@@ -99,8 +121,6 @@ export function buildCreateIssuePayload(draft: TicketDraft) {
     fields.priority = { name: draft.priority };
   }
 
-  // Team-managed / next-gen style parent link. Company-managed Epic Link
-  // customfield IDs vary — calibrate after reading createmeta.
   if (draft.epicKey) {
     fields.parent = { key: draft.epicKey };
   }
@@ -110,28 +130,35 @@ export function buildCreateIssuePayload(draft: TicketDraft) {
 
 export async function createIssueFromDraft(
   draft: TicketDraft,
-  config = getJiraConfig(),
+  config?: JiraConfig,
 ): Promise<CreateTicketResult> {
+  const resolved = config || (await getJiraConfigForCompany(draft.companyId));
   const { draftToMarkdown } = await import("@/lib/templates/ticket-body");
   const payload = buildCreateIssuePayload(draft);
   const previewMarkdown = draftToMarkdown(draft);
   const warnings = [...draft.missingFields.map((f) => `Missing/weak field: ${f}`)];
+  if (draft.confidence < 0.6) {
+    warnings.push(
+      `Low confidence (${Math.round(draft.confidence * 100)}%). Review before trusting unsupervised create.`,
+    );
+  }
 
-  if (config.dryRun) {
+  if (resolved.dryRun) {
     return {
       dryRun: true,
+      companyId: draft.companyId,
       key: `DRY-${Date.now().toString().slice(-6)}`,
       previewMarkdown,
       payload,
       warnings: [
         ...warnings,
-        "Dry-run only — no issue was created in Jira. Set credentials and JIRA_DRY_RUN=false to create for real.",
+        "Dry-run only — no issue was created in Jira for this company login.",
       ],
     };
   }
 
   const created = await jiraRequest<{ id: string; key: string; self: string }>(
-    config,
+    resolved,
     "/rest/api/3/issue",
     {
       method: "POST",
@@ -141,6 +168,7 @@ export async function createIssueFromDraft(
 
   return {
     dryRun: false,
+    companyId: draft.companyId,
     id: created.id,
     key: created.key,
     self: created.self,
@@ -150,16 +178,31 @@ export async function createIssueFromDraft(
   };
 }
 
-/** Best-effort harvest of a DoR-looking table from a golden ticket description ADF. */
-export async function harvestDorFromIssue(issueKey: string, config = getJiraConfig()) {
-  if (config.dryRun && (!config.baseUrl || !config.apiToken)) {
-    throw new Error("Configure Jira credentials before harvesting a golden ticket.");
+export async function createIssuesFromDrafts(
+  drafts: TicketDraft[],
+  config?: JiraConfig,
+): Promise<CreateTicketResult[]> {
+  const results: CreateTicketResult[] = [];
+  for (const draft of drafts) {
+    results.push(await createIssueFromDraft(draft, config));
+  }
+  return results;
+}
+
+export async function harvestDorFromIssue(
+  issueKey: string,
+  config?: JiraConfig,
+  companyIdOrSlug?: string,
+) {
+  const resolved = config || (await getJiraConfigForCompany(companyIdOrSlug));
+  if (!resolved.baseUrl || !resolved.apiToken) {
+    throw new Error("Configure this company's Jira credentials before harvesting.");
   }
 
   const issue = await jiraRequest<{
     key: string;
     fields: { description?: { content?: Array<Record<string, unknown>> } };
-  }>(config, `/rest/api/3/issue/${issueKey}?fields=description`);
+  }>(resolved, `/rest/api/3/issue/${issueKey}?fields=description`);
 
   const content = issue.fields.description?.content || [];
   const tables = content.filter((node) => node.type === "table");
@@ -167,7 +210,6 @@ export async function harvestDorFromIssue(issueKey: string, config = getJiraConf
     return { issueKey, rows: [], note: "No ADF tables found in description." };
   }
 
-  // Prefer the last table — DoR is commonly pasted at the bottom.
   const table = tables[tables.length - 1] as {
     content?: Array<{
       content?: Array<{
@@ -192,4 +234,13 @@ export async function harvestDorFromIssue(issueKey: string, config = getJiraConf
     }) || [];
 
   return { issueKey, rows, note: `Harvested ${rows.length} rows from ${issueKey}.` };
+}
+
+export function secretsFromBody(body: Partial<JiraConnectionSecrets>): JiraConnectionSecrets {
+  return {
+    baseUrl: body.baseUrl || "",
+    email: body.email || "",
+    apiToken: body.apiToken || "",
+    dryRun: body.dryRun ?? true,
+  };
 }

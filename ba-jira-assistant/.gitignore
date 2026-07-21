@@ -24,7 +24,7 @@
 .DS_Store
 *.pem
 
-# local BA context memory
+# local BA context memory + per-company secrets
 .data/
 
 # debug

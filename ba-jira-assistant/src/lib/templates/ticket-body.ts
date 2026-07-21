@@ -36,7 +36,10 @@ export function draftToMarkdown(draft: TicketDraft): string {
   return [
     `# ${draft.summary}`,
     "",
+    `**Company:** ${draft.companyId}`,
     `**Intent:** ${draft.intent}`,
+    draft.playbookId ? `**Playbook:** ${draft.playbookId}` : "",
+    `**Confidence:** ${Math.round(draft.confidence * 100)}%`,
     `**Project:** ${draft.projectKey}`,
     `**Issue type:** ${draft.issueType}`,
     draft.epicKey || draft.epicName

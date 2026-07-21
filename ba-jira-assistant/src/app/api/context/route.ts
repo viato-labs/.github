@@ -1,51 +1,72 @@
 import { NextResponse } from "next/server";
-import {
-  loadMemory,
-  replaceDefinitionOfReady,
-  saveMemory,
-  upsertEpic,
-} from "@/lib/context-store";
 import type { DorRow } from "@/lib/types";
+import {
+  getCompany,
+  replaceDefinitionOfReady,
+  saveCompanyMemory,
+  upsertEpic,
+} from "@/lib/workspaces/store";
 
-export async function GET() {
-  const memory = await loadMemory();
-  return NextResponse.json(memory);
+export async function GET(request: Request) {
+  const companyId = new URL(request.url).searchParams.get("companyId") || undefined;
+  const company = await getCompany(companyId);
+  return NextResponse.json({
+    companyId: company.id,
+    companyName: company.name,
+    memory: company.memory,
+    boards: company.boards,
+    playbooks: company.playbooks,
+  });
 }
 
 export async function PATCH(request: Request) {
   const body = (await request.json()) as {
+    companyId?: string;
     epic?: { name: string; key: string };
     definitionOfReady?: DorRow[];
     glossaryEntry?: { term: string; definition: string };
     houseStyleNote?: string;
+    section?: string;
     defaultProjectKey?: string;
     defaultIssueType?: string;
   };
 
-  let memory = await loadMemory();
+  const company = await getCompany(body.companyId);
+  let memory = company.memory;
 
   if (body.epic?.name && body.epic?.key) {
-    memory = await upsertEpic(body.epic.name, body.epic.key);
+    memory = (await upsertEpic(company.id, body.epic.name, body.epic.key)).memory;
   }
   if (body.definitionOfReady) {
-    memory = await replaceDefinitionOfReady(body.definitionOfReady);
+    memory = (await replaceDefinitionOfReady(company.id, body.definitionOfReady))
+      .memory;
   }
   if (body.glossaryEntry?.term) {
     memory.productGlossary[body.glossaryEntry.term] = body.glossaryEntry.definition;
-    await saveMemory(memory);
+    await saveCompanyMemory(company.id, memory);
   }
   if (body.houseStyleNote) {
     memory.houseStyleNotes.unshift(body.houseStyleNote);
-    await saveMemory(memory);
+    await saveCompanyMemory(company.id, memory);
+  }
+  if (body.section) {
+    if (!memory.sections.includes(body.section)) {
+      memory.sections.push(body.section);
+      await saveCompanyMemory(company.id, memory);
+    }
   }
   if (body.defaultProjectKey) {
     memory.defaultProjectKey = body.defaultProjectKey;
-    await saveMemory(memory);
+    await saveCompanyMemory(company.id, memory);
   }
   if (body.defaultIssueType) {
     memory.defaultIssueType = body.defaultIssueType;
-    await saveMemory(memory);
+    await saveCompanyMemory(company.id, memory);
   }
 
-  return NextResponse.json(await loadMemory());
+  const refreshed = await getCompany(company.id);
+  return NextResponse.json({
+    companyId: refreshed.id,
+    memory: refreshed.memory,
+  });
 }
