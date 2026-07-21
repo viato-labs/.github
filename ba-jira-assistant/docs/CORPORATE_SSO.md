@@ -11,9 +11,11 @@ Corporate Microsoft SSO almost always means:
 - no reusable password for scripts
 - API tokens often disabled or blocked by policy
 
-So full unattended “log in as me and create tickets” is **not** the default path.
+So full unattended “log in as me and create tickets” is **not** available.
 
-That does **not** kill the tool. It changes the delivery mode.
+**Chosen product path for this tool: Path A only.**  
+Draft here → copy/paste into Jira while you are signed in with Microsoft.  
+OAuth / API-token create (Path B/C) is explicitly out of scope unless requirements change.
 
 ---
 
@@ -34,69 +36,32 @@ You keep authenticity and speed. Automation stops at the Jira create click.
 
 This still achieves the main objective: minimal thinking to produce BA-standard tickets from short briefs/files.
 
-### 2) Browser OAuth (“Sign in with Atlassian / Microsoft”) — possible, but IT-gated
+### 2) Browser OAuth / API token / MCP create — out of scope for this deployment
 
-You do **not** need a personal API token for this path.
+These can exist in other products, but **we are not building or relying on them here** because corporate Microsoft SSO access will not be connected for create/edit.
 
-How it works:
-
-1. App opens Atlassian OAuth consent
-2. Atlassian redirects to **Microsoft login** (your normal corporate SSO + MFA)
-3. You approve scopes like `read:jira-work`, `write:jira-work`
-4. App receives short-lived access tokens and can create tickets as **you**
-
-Important constraints:
-
-- Someone must register an Atlassian OAuth app (you, Viato, or client IT)
-- Client IT may block third-party app consents
-- Tokens expire; refresh must be stored securely
-- Each company/tenant may need separate consent
-- This is interactive login in a browser — never “give the AI your Microsoft password”
-
-If IT allows one approved OAuth app, this is the clean path to near-autonomous create.
-
-### 3) Official Atlassian Rovo MCP in Cursor
-
-Same OAuth/SSO idea, Cursor-native. Useful if approved. Still may be blocked by enterprise app controls. Prefer org-approved / Runlayer-managed MCP configuration.
-
-### 4) API token / service account
-
-Ideal technically, often unavailable in locked-down corporates. Treat as optional upgrade, not the plan.
-
-### 5) Automating the Microsoft login form / storing your password
+### 3) Automating the Microsoft login form / storing your password
 
 **Do not do this.** Fragile with MFA, likely policy-violating, and insecure.
 
 ---
 
-## Practical operating model for you
+## Practical operating model (Path A only)
 
-| Capability | With Microsoft SSO only | With OAuth approved | With API token/service account |
-|---|---|---|---|
-| Draft authentic tickets from knowledge | Yes | Yes | Yes |
-| Bulk Excel → many drafts | Yes | Yes | Yes |
-| Company-isolated memory | Yes | Yes | Yes |
-| One-click create in Jira | No (copy/paste) | Yes | Yes |
-| Unsupervised create at scale | Partial (you click create) | Yes, with confidence gates | Yes |
+| Capability | Supported |
+|---|---|
+| Draft authentic tickets from knowledge | Yes |
+| Bulk Excel → many drafts | Yes |
+| Company-isolated memory | Yes |
+| Login to Jira inside this app | No |
+| Create/edit tickets via SSO connection | No — you do that in Jira |
+| Copy summary/description / bulk paste pack | Yes |
 
-For day-to-day BA value, **mode 1 already wins**: the hard part is writing consistent tickets, not clicking Create in Jira.
-
----
-
-## What to ask IT / the client (short email)
-
-If you want one-click create later:
-
-> We need an approved Atlassian OAuth app (or Atlassian Rovo MCP connector) so BAs can sign in with Microsoft SSO and allow ticket create on their behalf. We do not need shared passwords or personal API tokens if OAuth consent is permitted.
-
-If IT says no:
-
-> We'll keep the BA assistant in draft/export mode and create issues manually while signed in with Microsoft.
+Day-to-day value stays high: the hard part is writing consistent tickets; Create in Jira remains a short manual step while you are already signed in with Microsoft.
 
 ---
 
 ## Implication for this prototype
 
-Default access mode is now **Manual (Microsoft SSO in browser + copy/paste)**.
-
-API token fields remain as an optional advanced path. OAuth SSO connect is documented as the next enterprise upgrade when a client allows app consent.
+Access mode is **Manual only**: Microsoft SSO in the browser + copy/paste.  
+No in-app company SSO login for create/edit.

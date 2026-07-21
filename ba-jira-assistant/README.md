@@ -38,17 +38,16 @@ Without credentials the app stays in **dry-run** and still drafts full previews.
 4. Paste a brief **or** upload Excel/CSV
 5. Review confidence + preview → create
 
-## Access modes (important for corporate accounts)
+## Access model (Path A only)
 
-Corporate Jira is usually **Microsoft SSO only** — no API tokens. See [`docs/CORPORATE_SSO.md`](./docs/CORPORATE_SSO.md).
+Corporate Jira is **Microsoft SSO in your browser**. This app does **not** connect SSO or create/edit tickets for you. See [`docs/CORPORATE_SSO.md`](./docs/CORPORATE_SSO.md).
 
-1. **Manual (default):** draft here → copy summary/description → create in Jira while signed in with Microsoft
-2. **OAuth SSO (later):** browser “Sign in with Microsoft/Atlassian” if IT approves an OAuth app
-3. **API token (optional):** only if a client actually allows it
+1. Sign into Jira with Microsoft yourself
+2. Draft tickets here (briefs / Excel / company knowledge)
+3. Copy summary + description (or download a bulk paste pack)
+4. Create/edit the issue in Jira
 
-Do **not** share Microsoft passwords with the assistant.
-
-Optional token setup (rare): UI login panel or `POST /api/companies/credentials`. Secrets stay under `.data/workspaces/<slug>/secrets.json` (gitignored).
+Do **not** share Microsoft passwords with the assistant. OAuth/API create is out of scope for this deployment.
 
 ## Example briefs
 
