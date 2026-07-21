@@ -82,7 +82,7 @@ export async function probeJira(config: JiraConfig, companyName?: string) {
     return {
       ok: false,
       dryRun: true,
-      message: `${label}No Jira credentials configured. Dry-run only. Add a company login (API token) to create live tickets.`,
+      message: `${label}No API credentials (normal for Microsoft SSO corporates). Use manual copy/paste, or add an API token/OAuth if IT allows.`,
     };
   }
 

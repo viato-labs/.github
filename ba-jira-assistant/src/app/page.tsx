@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  bulkPackMarkdown,
+  draftDescriptionForPaste,
+  draftSummaryForPaste,
+} from "@/lib/export/clipboard";
 import type {
   ChatMessage,
   CompanySummary,
   PlaybookId,
   TicketDraft,
 } from "@/lib/types";
+
+type AccessMode = "manual" | "api-token";
 
 type JiraStatus = {
   ok: boolean;
@@ -48,6 +55,7 @@ export default function Home() {
   const [status, setStatus] = useState<JiraStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastResult, setLastResult] = useState("");
+  const [accessMode, setAccessMode] = useState<AccessMode>("manual");
   const [showLogin, setShowLogin] = useState(false);
   const [loginForm, setLoginForm] = useState({
     baseUrl: "",
@@ -88,7 +96,7 @@ export default function Home() {
           id: "welcome",
           role: "assistant",
           createdAt: new Date().toISOString(),
-          content: `Working in **${companyData.company.name}**. Knowledge, boards, and Jira login are isolated per company. Paste a brief, or upload Excel/CSV and pick a playbook (e.g. Christie's field-trip-by-engagement, McLaren configurator-design-sections).`,
+          content: `Working in **${companyData.company.name}**. Corporate default is Microsoft SSO only — so this app drafts authentic tickets and you paste/create them in Jira while signed in with Microsoft. API tokens are optional and often unavailable. Knowledge stays isolated per company.`,
         },
       ]);
       const defaultPlaybook =
@@ -98,10 +106,40 @@ export default function Home() {
   }, []);
 
   const statusTone = useMemo(() => {
+    if (accessMode === "manual") return "ok";
     if (!status) return "warn";
     if (status.ok && !status.dryRun) return "ok";
     return "warn";
-  }, [status]);
+  }, [status, accessMode]);
+
+  const statusLabel = useMemo(() => {
+    if (accessMode === "manual") {
+      return `${activeCompany?.name || "Company"}: Manual mode — draft here, create in Jira via Microsoft SSO`;
+    }
+    return status?.message || "Checking Jira API connection…";
+  }, [accessMode, activeCompany?.name, status?.message]);
+
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setLastResult(`Copied ${label}`);
+    } catch {
+      setLastResult(`Could not copy ${label}`);
+    }
+  }
+
+  function downloadBulkPack() {
+    if (!bulkDrafts.length) return;
+    const content = bulkPackMarkdown(bulkDrafts);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${activeCompany?.slug || "company"}-ticket-pack.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setLastResult(`Downloaded ${bulkDrafts.length}-ticket pack`);
+  }
 
   async function switchCompany(companyId: string) {
     setBusy(true);
@@ -413,9 +451,9 @@ export default function Home() {
     <main className="app-shell">
       <h1 className="brand">BA Jira Assistant</h1>
       <p className="lede">
-        Multi-company ticket studio. Each client (Christie&apos;s, McLaren, …)
-        keeps its own Jira login, boards, DoR, glossary, and history — so tickets
-        stay authentic to that organisation with minimal supervision.
+        Multi-company ticket studio for corporate Microsoft SSO worlds. Draft
+        authentic tickets from company-isolated knowledge; paste into Jira while
+        signed in with Microsoft. API push is optional and often unavailable.
       </p>
 
       <div className="status-row">
@@ -434,6 +472,17 @@ export default function Home() {
           </select>
         </label>
         <label className="chip">
+          Access{" "}
+          <select
+            value={accessMode}
+            disabled={busy}
+            onChange={(e) => setAccessMode(e.target.value as AccessMode)}
+          >
+            <option value="manual">Microsoft SSO + copy/paste</option>
+            <option value="api-token">API token (if client allows)</option>
+          </select>
+        </label>
+        <label className="chip">
           Playbook{" "}
           <select
             value={playbookId}
@@ -448,7 +497,7 @@ export default function Home() {
           </select>
         </label>
         <span className="chip" data-tone={statusTone}>
-          {status?.message || "Checking Jira connection…"}
+          {statusLabel}
         </span>
         {activeCompany ? (
           <span className="chip">
@@ -467,7 +516,7 @@ export default function Home() {
 
       <div className="actions" style={{ marginTop: "0.85rem" }}>
         <button disabled={busy} onClick={() => setShowLogin((v) => !v)}>
-          {showLogin ? "Hide company login" : "Add / update company Jira login"}
+          {showLogin ? "Hide access settings" : "Access settings / add company"}
         </button>
         {playbookId === "configurator-design-sections" ? (
           <button
@@ -479,12 +528,17 @@ export default function Home() {
           </button>
         ) : null}
         {bulkDrafts.length ? (
+          <button disabled={busy} onClick={() => downloadBulkPack()}>
+            Download bulk paste pack
+          </button>
+        ) : null}
+        {bulkDrafts.length && accessMode === "api-token" ? (
           <button
             className="primary"
             disabled={busy}
             onClick={() => void createBulkDrafts()}
           >
-            Create all drafted bulk tickets
+            API-create all drafted tickets
           </button>
         ) : null}
       </div>
@@ -492,49 +546,64 @@ export default function Home() {
       {showLogin ? (
         <section className="panel" style={{ marginTop: "1rem", minHeight: 0 }}>
           <div className="panel-header">
-            Jira login for {activeCompany?.name || "company"}
+            Access for {activeCompany?.name || "company"}
           </div>
           <div className="composer">
-            <input
-              placeholder="https://company.atlassian.net"
-              value={loginForm.baseUrl}
-              onChange={(e) =>
-                setLoginForm((prev) => ({ ...prev, baseUrl: e.target.value }))
-              }
-            />
-            <input
-              placeholder="email@company.com"
-              value={loginForm.email}
-              onChange={(e) =>
-                setLoginForm((prev) => ({ ...prev, email: e.target.value }))
-              }
-            />
-            <input
-              placeholder="API token (not password)"
-              type="password"
-              value={loginForm.apiToken}
-              onChange={(e) =>
-                setLoginForm((prev) => ({ ...prev, apiToken: e.target.value }))
-              }
-            />
-            <label className="file-row">
-              <input
-                type="checkbox"
-                checked={loginForm.dryRun}
-                onChange={(e) =>
-                  setLoginForm((prev) => ({
-                    ...prev,
-                    dryRun: e.target.checked,
-                  }))
-                }
-              />
-              Dry-run (recommended until house style is trusted)
-            </label>
-            <div className="actions">
-              <button className="primary" disabled={busy} onClick={() => void saveLogin()}>
-                Save login for this company only
-              </button>
-            </div>
+            <p className="file-row">
+              Corporate default: stay signed into Jira with Microsoft in your
+              browser. This app does not need your Microsoft password. Use copy
+              buttons to paste tickets. OAuth “Sign in with Microsoft” can be
+              added later if IT approves an Atlassian app — see{" "}
+              <code>docs/CORPORATE_SSO.md</code>.
+            </p>
+            {accessMode === "api-token" ? (
+              <>
+                <input
+                  placeholder="https://company.atlassian.net"
+                  value={loginForm.baseUrl}
+                  onChange={(e) =>
+                    setLoginForm((prev) => ({ ...prev, baseUrl: e.target.value }))
+                  }
+                />
+                <input
+                  placeholder="email@company.com"
+                  value={loginForm.email}
+                  onChange={(e) =>
+                    setLoginForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                />
+                <input
+                  placeholder="API token (not Microsoft password)"
+                  type="password"
+                  value={loginForm.apiToken}
+                  onChange={(e) =>
+                    setLoginForm((prev) => ({ ...prev, apiToken: e.target.value }))
+                  }
+                />
+                <label className="file-row">
+                  <input
+                    type="checkbox"
+                    checked={loginForm.dryRun}
+                    onChange={(e) =>
+                      setLoginForm((prev) => ({
+                        ...prev,
+                        dryRun: e.target.checked,
+                      }))
+                    }
+                  />
+                  Dry-run (recommended until house style is trusted)
+                </label>
+                <div className="actions">
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={() => void saveLogin()}
+                  >
+                    Save API token for this company only
+                  </button>
+                </div>
+              </>
+            ) : null}
             <div className="file-row">
               <input
                 placeholder="Add another company name"
@@ -595,9 +664,41 @@ export default function Home() {
               >
                 Draft from brief
               </button>
-              <button disabled={busy || !draft} onClick={() => void createTicket()}>
-                Create current ticket
+              <button
+                disabled={!draft}
+                onClick={() =>
+                  draft &&
+                  void copyText("summary", draftSummaryForPaste(draft))
+                }
+              >
+                Copy summary
               </button>
+              <button
+                disabled={!draft}
+                onClick={() =>
+                  draft &&
+                  void copyText(
+                    "description",
+                    draftDescriptionForPaste(draft),
+                  )
+                }
+              >
+                Copy description
+              </button>
+              <button
+                disabled={!draft}
+                onClick={() => draft && void copyText("full ticket", preview)}
+              >
+                Copy full ticket
+              </button>
+              {accessMode === "api-token" ? (
+                <button
+                  disabled={busy || !draft}
+                  onClick={() => void createTicket()}
+                >
+                  API-create current ticket
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -615,6 +716,10 @@ export default function Home() {
             <div>
               {activeCompany?.playbooks.find((p) => p.id === playbookId)
                 ?.description || "Choose a playbook"}
+            </div>
+            <div>
+              Paste path: open Jira (Microsoft SSO) → New issue → paste summary +
+              description.
             </div>
             {bulkSummaries.length ? (
               <div>
@@ -638,13 +743,12 @@ export default function Home() {
       </div>
 
       <p className="hint">
-        Objective: give key parameters or a file, and let company-scoped history
-        write tickets to BA standard without babysitting. Christie&apos;s example:
-        Excel → playbook <code>field-trip-by-engagement</code> → one ticket per
-        row. McLaren example: playbook{" "}
-        <code>configurator-design-sections</code> → design tickets per known
-        section. See <code>docs/FEASIBILITY.md</code> and{" "}
-        <code>docs/MULTI_COMPANY.md</code>.
+        Microsoft SSO only is expected. Do not share passwords. The assistant
+        still delivers the hard part: authentic BA-standard tickets from short
+        briefs/files. Christie&apos;s Excel →{" "}
+        <code>field-trip-by-engagement</code>; McLaren →{" "}
+        <code>configurator-design-sections</code>. See{" "}
+        <code>docs/CORPORATE_SSO.md</code>.
       </p>
     </main>
   );

@@ -38,21 +38,17 @@ Without credentials the app stays in **dry-run** and still drafts full previews.
 4. Paste a brief **or** upload Excel/CSV
 5. Review confidence + preview → create
 
-## Connect Jira (per company)
+## Access modes (important for corporate accounts)
 
-Prefer the UI login panel. Or `POST /api/companies/credentials` with:
+Corporate Jira is usually **Microsoft SSO only** — no API tokens. See [`docs/CORPORATE_SSO.md`](./docs/CORPORATE_SSO.md).
 
-```json
-{
-  "companyId": "company_christies",
-  "baseUrl": "https://your-domain.atlassian.net",
-  "email": "you@company.com",
-  "apiToken": "...",
-  "dryRun": true
-}
-```
+1. **Manual (default):** draft here → copy summary/description → create in Jira while signed in with Microsoft
+2. **OAuth SSO (later):** browser “Sign in with Microsoft/Atlassian” if IT approves an OAuth app
+3. **API token (optional):** only if a client actually allows it
 
-Tokens are stored under `.data/workspaces/<slug>/secrets.json` (gitignored).
+Do **not** share Microsoft passwords with the assistant.
+
+Optional token setup (rare): UI login panel or `POST /api/companies/credentials`. Secrets stay under `.data/workspaces/<slug>/secrets.json` (gitignored).
 
 ## Example briefs
 

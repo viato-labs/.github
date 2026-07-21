@@ -30,28 +30,31 @@ Fidelity is then a template problem, not an API limitation.
 
 ---
 
-## Access options (easiest → most enterprise-ready)
+## Access options (corporate Microsoft SSO first)
 
-| Approach | Effort | Good for | Notes |
-|---|---|---|---|
-| **Email + API token (Basic auth)** | Lowest | Personal BA bot / prototype | Create token at Atlassian account security. Never use account password. Works immediately if the user can create issues in the target project. |
-| **Service account + scoped token** | Low–medium | Shared team automation | Preferred once IT approves. Use gateway URL `https://api.atlassian.com/ex/jira/{cloudId}/...`. |
-| **OAuth 2.0 (3LO)** | Medium | Multi-user web app | Correct model if several BAs each create tickets as themselves. Needs Atlassian developer app + consent. |
-| **Atlassian Rovo MCP (Cursor/ChatGPT/Claude)** | Low (config) | Agent-native create/search | Official remote MCP; OAuth. Great for “ask Cursor to create a ticket,” weaker for a branded BA chat product with private long-term memory. |
-| **Browser login / SSO password scrape** | Avoid | — | Fragile, often blocked by SSO/MFA, against Atlassian guidance, and a security risk. |
+Many client estates will **not** give API tokens. The realistic access is a normal **Microsoft SSO login** in the browser. See [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
 
-### Corporate realities at a place like Christie's
+| Approach | Fits Microsoft-SSO-only corporates? | Notes |
+|---|---|---|
+| **Manual draft + copy/paste into Jira** | **Yes — default** | You stay logged in via Microsoft; the assistant writes the ticket body. Highest success rate with zero IT asks. |
+| **OAuth 2.0 (3LO) “Sign in with Microsoft/Atlassian”** | Maybe | Browser SSO + MFA, then app gets tokens. No API token needed. Requires approved Atlassian OAuth app / admin consent. |
+| **Atlassian Rovo MCP** | Maybe | Same OAuth/SSO idea inside Cursor; often admin-gated. Prefer org-approved / Runlayer-managed MCP. |
+| **Email + API token** | Often blocked | Easy technically, frequently unavailable in locked-down enterprises. |
+| **Service account** | Rare for BA freelancers | Best for shared automation if IT provisions it. |
+| **Sharing Microsoft password / automating the login form** | No | MFA + Conditional Access + policy risk. Do not do this. |
+
+### Corporate realities at places like Christie's / McLaren
 
 Expect these to dominate schedule more than coding:
 
-- SSO / MFA (password login to an agent is a non-starter)
-- Admin approval for API tokens or MCP connectors
+- Microsoft SSO / MFA (password cannot be given to an agent)
+- API tokens disabled or unapproved
+- Third-party OAuth / MCP connectors may need security review
 - Required custom fields on create screens
 - Project permission schemes (“Create Issues” on the BA role)
-- Possible IP allowlisting or Data Center vs Cloud differences
-- Audit expectations (who created the ticket: human vs bot)
+- Audit expectations (ticket created by the human BA identity)
 
-**Bottom line on “if I give you a login”:** give an API token (or OAuth consent) for an account that already creates good BA tickets by hand. That is enough to automate. Do not share a password.
+**Bottom line on “I only have a Microsoft login”:** that is enough to use the assistant for authentic drafting and bulk Excel→ticket packs. Direct create-in-Jira needs either (a) you paste while signed in, or (b) IT-approved OAuth consent — not a shared password.
 
 ---
 
@@ -260,8 +263,10 @@ With those, the assistant can lock each company's template and create tickets th
 
 ## Security notes
 
-- Store tokens in env / secret manager, never in chat history dumps committed to git
-- Prefer a dedicated automation user so human BA accounts are not shared
-- Log every create with source brief ID for auditability
-- Default to **preview → confirm → create**
+- Never collect or store Microsoft SSO passwords
+- Prefer manual paste or browser OAuth consent over long-lived secrets
+- If tokens exist, store them in env / secret manager, never in committed chat dumps
+- Prefer a dedicated automation user only when IT provisions one
+- Log every create/export with source brief ID for auditability
+- Default to **preview → copy/paste or confirm → create**
 - Redact PII from long-term memory if briefs include customer data
