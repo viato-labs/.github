@@ -13,6 +13,22 @@ import type {
   TicketDraft,
 } from "@/lib/types";
 
+type AuthStatus = {
+  ok: boolean;
+  dryRun: boolean;
+  connected?: boolean;
+  mode?: string;
+  message: string;
+  oauthAppConfigured?: boolean;
+  oauthConnected?: boolean;
+  companyName?: string;
+  connection?: {
+    oauthConnected?: boolean;
+    oauthAccountName?: string;
+    oauthSiteName?: string;
+  };
+};
+
 function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -45,12 +61,18 @@ export default function Home() {
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastResult, setLastResult] = useState("");
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [showCompanies, setShowCompanies] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
+  const [editKey, setEditKey] = useState("");
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
     [companies, activeCompanyId],
+  );
+
+  const signedIn = Boolean(
+    authStatus?.oauthConnected || authStatus?.connection?.oauthConnected,
   );
 
   async function refreshCompanies(preferredId?: string) {
@@ -62,9 +84,30 @@ export default function Home() {
     return nextId as string;
   }
 
+  async function refreshAuth(companyId: string) {
+    const response = await fetch(
+      `/api/auth/atlassian/status?companyId=${companyId}`,
+    );
+    const data = await response.json();
+    setAuthStatus(data);
+  }
+
   useEffect(() => {
     void (async () => {
-      const companyId = await refreshCompanies();
+      const params = new URLSearchParams(window.location.search);
+      const oauth = params.get("oauth");
+      const preferredCompany = params.get("companyId") || undefined;
+      const companyId = await refreshCompanies(preferredCompany || undefined);
+      await refreshAuth(companyId);
+
+      if (oauth === "success") {
+        setLastResult("Signed in with Microsoft/Atlassian — app can act as you in Jira");
+        window.history.replaceState({}, "", "/");
+      } else if (oauth === "error") {
+        setLastResult(params.get("message") || "OAuth sign-in failed");
+        window.history.replaceState({}, "", "/");
+      }
+
       const companyRes = await fetch(`/api/chat?companyId=${companyId}`);
       const companyData = await companyRes.json();
       setMessages([
@@ -72,12 +115,12 @@ export default function Home() {
           id: "welcome",
           role: "assistant",
           createdAt: new Date().toISOString(),
-          content: `Working in **${companyData.company.name}**. There is no in-app SSO login. Sign into Jira with Microsoft in your browser, draft here, then copy/paste to create or edit tickets. Knowledge stays isolated per company.`,
+          content: `Working in **${companyData.company.name}**. Path B: click **Sign in with Microsoft** to authorize this app to create/edit Jira tickets as you (browser SSO + MFA). No password is stored here.`,
         },
       ]);
-      const defaultPlaybook =
-        (companyData.company.playbooks?.[0]?.id as PlaybookId) || "single-brief";
-      setPlaybookId(defaultPlaybook);
+      setPlaybookId(
+        (companyData.company.playbooks?.[0]?.id as PlaybookId) || "single-brief",
+      );
     })();
   }, []);
 
@@ -115,6 +158,7 @@ export default function Home() {
       const nextCompanies = (switchedData.companies || []) as CompanySummary[];
       setCompanies(nextCompanies);
       setActiveCompanyId(companyId);
+      await refreshAuth(companyId);
       setDraft(null);
       setBulkDrafts([]);
       setBulkSummaries([]);
@@ -128,9 +172,31 @@ export default function Home() {
           id: uid(),
           role: "assistant",
           createdAt: new Date().toISOString(),
-          content: `Switched to **${company?.name || companyId}**. Sign into that company's Jira with Microsoft separately, then paste drafts there.`,
+          content: `Switched to **${company?.name || companyId}**. Sign in with Microsoft for this company if you want the app to create/edit Jira as you there.`,
         },
       ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startSignIn() {
+    if (!activeCompanyId) return;
+    window.location.href = `/api/auth/atlassian/start?companyId=${encodeURIComponent(activeCompanyId)}`;
+  }
+
+  async function signOut() {
+    if (!activeCompanyId) return;
+    setBusy(true);
+    try {
+      await fetch("/api/auth/atlassian/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: activeCompanyId }),
+      });
+      await refreshCompanies(activeCompanyId);
+      await refreshAuth(activeCompanyId);
+      setLastResult("Signed out of Jira for this company");
     } finally {
       setBusy(false);
     }
@@ -176,7 +242,9 @@ export default function Home() {
         {
           id: uid(),
           role: "assistant",
-          content: `${data.reply}\n\nNext: copy summary + description into Jira while signed in with Microsoft.`,
+          content: signedIn
+            ? `${data.reply}\n\nSigned in — you can create this ticket in Jira as you.`
+            : `${data.reply}\n\nNot signed in yet — Sign in with Microsoft, or copy/paste manually.`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -201,6 +269,116 @@ export default function Home() {
           createdAt: new Date().toISOString(),
         },
       ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createTicket() {
+    if (!draft || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/tickets/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft, companyId: activeCompanyId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setLastResult(data.error || "Create failed");
+        return;
+      }
+      const result = data.result;
+      setLastResult(
+        `${result.dryRun ? "Dry-run" : "Created"} ${result.key} as you in ${data.company.name}`,
+      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          content: `${result.dryRun ? "Dry-run ticket" : "Created Jira issue"} **${result.key}** in ${data.company.name}.`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setPreview(result.previewMarkdown || preview);
+      await refreshCompanies(activeCompanyId);
+    } catch {
+      setLastResult("Create request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateTicket() {
+    if (!draft || !editKey.trim() || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/tickets/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueKey: editKey.trim(),
+          draft,
+          companyId: activeCompanyId,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setLastResult(data.error || "Update failed");
+        return;
+      }
+      setLastResult(`Updated ${data.result.key} as you`);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          content: `Updated Jira issue **${data.result.key}** using the current draft.`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } catch {
+      setLastResult("Update request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createBulkDrafts() {
+    if (!bulkDrafts.length || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/tickets/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          drafts: bulkDrafts,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setLastResult(data.error || "Bulk create failed");
+        return;
+      }
+      const createdCount = data.results?.length || 0;
+      const dryRun = data.results?.[0]?.dryRun;
+      setLastResult(
+        `${createdCount} ticket(s) ${dryRun ? "dry-run" : "created"} as you for ${data.company.name}`,
+      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          content: `Bulk ${dryRun ? "dry-run" : "create"} complete for **${data.company.name}**: ${createdCount} tickets.`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      await refreshCompanies(activeCompanyId);
+    } catch {
+      setLastResult("Bulk create failed");
     } finally {
       setBusy(false);
     }
@@ -251,7 +429,11 @@ export default function Home() {
         {
           id: uid(),
           role: "assistant",
-          content: `Prepared **${data.draftCount}** drafts for **${data.company.name}**. Download the paste pack or copy each ticket into Jira under Microsoft SSO.`,
+          content: `Prepared **${data.draftCount}** drafts for **${data.company.name}**. ${
+            signedIn
+              ? "Create them in Jira as you, or download a paste pack."
+              : "Sign in with Microsoft to create them as you."
+          }`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -303,19 +485,21 @@ export default function Home() {
       }
       setNewCompanyName("");
       await refreshCompanies(data.company.id);
+      await refreshAuth(data.company.id);
       setLastResult(`Added company ${data.company.name}`);
     } finally {
       setBusy(false);
     }
   }
 
+  const statusTone = signedIn ? "ok" : "warn";
+
   return (
     <main className="app-shell">
       <h1 className="brand">BA Jira Assistant</h1>
       <p className="lede">
-        Draft authentic tickets from company knowledge and files. You stay signed
-        into Jira with Microsoft yourself — this app does not connect SSO or create
-        tickets for you.
+        Path B: sign in with Microsoft through Atlassian, then this app creates and
+        edits Jira tickets as you — per company workspace.
       </p>
 
       <div className="status-row">
@@ -347,16 +531,9 @@ export default function Home() {
             ))}
           </select>
         </label>
-        <span className="chip" data-tone="ok">
-          {activeCompany?.name || "Company"}: draft → copy/paste into Jira
-          (Microsoft SSO in browser)
+        <span className="chip" data-tone={statusTone}>
+          {authStatus?.message || "Checking Jira sign-in…"}
         </span>
-        {activeCompany ? (
-          <span className="chip">
-            Memory: {activeCompany.memoryStats.historicalTickets} refs ·{" "}
-            {activeCompany.memoryStats.briefs} briefs
-          </span>
-        ) : null}
         {draft ? (
           <span className="chip">
             Draft confidence {Math.round(draft.confidence * 100)}%
@@ -366,6 +543,19 @@ export default function Home() {
       </div>
 
       <div className="actions" style={{ marginTop: "0.85rem" }}>
+        {!signedIn ? (
+          <button
+            className="primary"
+            disabled={busy || !authStatus?.oauthAppConfigured}
+            onClick={() => startSignIn()}
+          >
+            Sign in with Microsoft
+          </button>
+        ) : (
+          <button disabled={busy} onClick={() => void signOut()}>
+            Sign out of Jira for this company
+          </button>
+        )}
         <button disabled={busy} onClick={() => setShowCompanies((v) => !v)}>
           {showCompanies ? "Hide companies" : "Add company workspace"}
         </button>
@@ -379,19 +569,38 @@ export default function Home() {
           </button>
         ) : null}
         {bulkDrafts.length ? (
-          <button className="primary" disabled={busy} onClick={() => downloadBulkPack()}>
-            Download bulk paste pack
-          </button>
+          <>
+            <button disabled={busy} onClick={() => downloadBulkPack()}>
+              Download paste pack
+            </button>
+            <button
+              className="primary"
+              disabled={busy || !signedIn}
+              onClick={() => void createBulkDrafts()}
+            >
+              Create all in Jira as me
+            </button>
+          </>
         ) : null}
       </div>
+
+      {!authStatus?.oauthAppConfigured ? (
+        <p className="hint" style={{ marginTop: "0.85rem" }}>
+          OAuth app not configured yet. Add <code>ATLASSIAN_CLIENT_ID</code> and{" "}
+          <code>ATLASSIAN_CLIENT_SECRET</code> from an Atlassian developer OAuth
+          2.0 (3LO) app. Callback URL:{" "}
+          <code>http://localhost:3000/api/auth/atlassian/callback</code>. See{" "}
+          <code>docs/CORPORATE_SSO.md</code>.
+        </p>
+      ) : null}
 
       {showCompanies ? (
         <section className="panel" style={{ marginTop: "1rem", minHeight: 0 }}>
           <div className="panel-header">Company workspaces</div>
           <div className="composer">
             <p className="file-row">
-              Each company keeps its own knowledge base. Jira login stays in your
-              browser via Microsoft — never entered here.
+              Each company has its own knowledge + its own Microsoft/Atlassian
+              sign-in session.
             </p>
             <div className="file-row">
               <input
@@ -454,6 +663,13 @@ export default function Home() {
                 Draft from brief
               </button>
               <button
+                className="primary"
+                disabled={busy || !draft || !signedIn}
+                onClick={() => void createTicket()}
+              >
+                Create in Jira as me
+              </button>
+              <button
                 disabled={!draft}
                 onClick={() =>
                   draft && void copyText("summary", draftSummaryForPaste(draft))
@@ -470,11 +686,18 @@ export default function Home() {
               >
                 Copy description
               </button>
+            </div>
+            <div className="file-row">
+              <input
+                placeholder="Existing issue key to edit (e.g. WEB-123)"
+                value={editKey}
+                onChange={(e) => setEditKey(e.target.value)}
+              />
               <button
-                disabled={!draft}
-                onClick={() => draft && void copyText("full ticket", preview)}
+                disabled={busy || !draft || !editKey.trim() || !signedIn}
+                onClick={() => void updateTicket()}
               >
-                Copy full ticket
+                Update issue as me
               </button>
             </div>
           </div>
@@ -495,8 +718,9 @@ export default function Home() {
                 ?.description || "Choose a playbook"}
             </div>
             <div>
-              Your login: Jira in the browser with Microsoft. Then paste summary +
-              description into New issue / Edit.
+              {signedIn
+                ? `Acting as ${authStatus?.connection?.oauthAccountName || "you"} on ${authStatus?.connection?.oauthSiteName || "Jira"}.`
+                : "Sign in with Microsoft to create/edit as you."}
             </div>
             {bulkSummaries.length ? (
               <div>
@@ -520,8 +744,10 @@ export default function Home() {
       </div>
 
       <p className="hint">
-        No in-app SSO. Workflow: Microsoft login in Jira → draft here → copy/paste.
-        Details in <code>docs/CORPORATE_SSO.md</code>.
+        Sign-in opens Atlassian consent, then your company Microsoft login/MFA.
+        Tokens are stored per company under <code>.data/workspaces/</code> and
+        never ask for your password in this app. Setup:{" "}
+        <code>docs/CORPORATE_SSO.md</code>.
       </p>
     </main>
   );

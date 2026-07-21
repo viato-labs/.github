@@ -30,31 +30,26 @@ Fidelity is then a template problem, not an API limitation.
 
 ---
 
-## Access options (corporate Microsoft SSO first)
+## Access options (Path B chosen)
 
-Many client estates will **not** give API tokens. The realistic access is a normal **Microsoft SSO login** in the browser. See [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
+Corporate estates often block API tokens. Path B uses **Atlassian OAuth 2.0 (3LO)** so you sign in with **Microsoft SSO + MFA in the browser**, then the app creates/edits Jira **as you**. See [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
 
-| Approach | Fits Microsoft-SSO-only corporates? | Notes |
+| Approach | Status here | Notes |
 |---|---|---|
-| **Manual draft + copy/paste into Jira** | **Yes — default** | You stay logged in via Microsoft; the assistant writes the ticket body. Highest success rate with zero IT asks. |
-| **OAuth 2.0 (3LO) “Sign in with Microsoft/Atlassian”** | Maybe | Browser SSO + MFA, then app gets tokens. No API token needed. Requires approved Atlassian OAuth app / admin consent. |
-| **Atlassian Rovo MCP** | Maybe | Same OAuth/SSO idea inside Cursor; often admin-gated. Prefer org-approved / Runlayer-managed MCP. |
-| **Email + API token** | Often blocked | Easy technically, frequently unavailable in locked-down enterprises. |
-| **Service account** | Rare for BA freelancers | Best for shared automation if IT provisions it. |
-| **Sharing Microsoft password / automating the login form** | No | MFA + Conditional Access + policy risk. Do not do this. |
+| **OAuth 2.0 (3LO) “Sign in with Microsoft/Atlassian”** | **Chosen (Path B)** | No API token. Browser SSO consent. Per-company sessions. |
+| **Manual draft + copy/paste** | Fallback | If a client blocks OAuth app consent. |
+| **Atlassian Rovo MCP** | Optional later | Same SSO idea inside Cursor; prefer org-approved / Runlayer-managed MCP. |
+| **Email + API token** | Optional legacy | Often blocked. |
+| **Sharing Microsoft password / automating the login form** | No | Do not do this. |
 
 ### Corporate realities at places like Christie's / McLaren
 
-Expect these to dominate schedule more than coding:
+- Microsoft SSO / MFA (password is never stored in the app)
+- API tokens often unavailable — OAuth is the create path
+- OAuth app may need client IT allowlisting
+- Tickets are created under the signed-in BA identity (good for audit)
 
-- Microsoft SSO / MFA (password cannot be given to an agent)
-- API tokens disabled or unapproved
-- Third-party OAuth / MCP connectors may need security review
-- Required custom fields on create screens
-- Project permission schemes (“Create Issues” on the BA role)
-- Audit expectations (ticket created by the human BA identity)
-
-**Bottom line on “I only have a Microsoft login”:** that is enough to use the assistant for authentic drafting and bulk Excel→ticket packs. Direct create-in-Jira needs either (a) you paste while signed in, or (b) IT-approved OAuth consent — not a shared password.
+**Bottom line:** Sign in with Microsoft once per company workspace; the app then creates/edits tickets as you.
 
 ---
 

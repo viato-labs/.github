@@ -1,67 +1,71 @@
-# Corporate access reality: Microsoft SSO, no API tokens
+# Path B: Sign in with Microsoft — app acts as you in Jira
 
-## Straight answer
+## Chosen model
 
-If Christie's / McLaren / other clients only give you a **normal Microsoft login** into Jira, you usually **cannot** hand that login to an automation agent the way people imagine (email + password → bot creates tickets).
+You click **Sign in with Microsoft** in this app.
 
-Corporate Microsoft SSO almost always means:
+1. Browser opens Atlassian consent
+2. Atlassian redirects to your **company Microsoft login + MFA**
+3. You approve access
+4. The app receives tokens and can **create/edit Jira tickets as you**
+5. Each company workspace keeps its own sign-in session
 
-- browser login
-- MFA / Conditional Access
-- no reusable password for scripts
-- API tokens often disabled or blocked by policy
-
-So full unattended “log in as me and create tickets” is **not** available.
-
-**Chosen product path for this tool: Path A only.**  
-Draft here → copy/paste into Jira while you are signed in with Microsoft.  
-OAuth / API-token create (Path B/C) is explicitly out of scope unless requirements change.
+You do **not** paste your Microsoft password into the app or into chat.
 
 ---
 
-## What still works (ranked for your situation)
+## One-time setup (Atlassian OAuth app)
 
-### 1) Assistant drafts → you paste into Jira (most reliable now)
+Someone (you or Viato) creates an OAuth 2.0 (3LO) app in the
+[Atlassian Developer Console](https://developer.atlassian.com/console/myapps/):
 
-**Best default for corporate BA work with only Microsoft SSO.**
+1. Create app → **OAuth 2.0 (3LO)**
+2. Callback URL:
+   - Local: `http://localhost:3000/api/auth/atlassian/callback`
+   - Deployed: `https://your-domain/api/auth/atlassian/callback`
+3. Permissions / scopes:
+   - `read:jira-work`
+   - `write:jira-work`
+   - `read:jira-user`
+   - `offline_access` (refresh token — required)
+4. Copy Client ID + Client Secret into `.env.local`:
 
-Flow:
+```env
+ATLASSIAN_CLIENT_ID=...
+ATLASSIAN_CLIENT_SECRET=...
+ATLASSIAN_REDIRECT_URI=http://localhost:3000/api/auth/atlassian/callback
+APP_BASE_URL=http://localhost:3000
+```
 
-1. Work in this app (company-isolated knowledge, Excel playbooks, house template)
-2. Copy summary + description (or export a bulk pack)
-3. Create the issue yourself while already logged into Jira via Microsoft
-4. Optionally paste attachments manually
+5. Restart `npm run dev`
+6. In the UI: choose company → **Sign in with Microsoft**
 
-You keep authenticity and speed. Automation stops at the Jira create click.
-
-This still achieves the main objective: minimal thinking to produce BA-standard tickets from short briefs/files.
-
-### 2) Browser OAuth / API token / MCP create — out of scope for this deployment
-
-These can exist in other products, but **we are not building or relying on them here** because corporate Microsoft SSO access will not be connected for create/edit.
-
-### 3) Automating the Microsoft login form / storing your password
-
-**Do not do this.** Fragile with MFA, likely policy-violating, and insecure.
+If a client blocks third-party app consent, IT must allow this OAuth app (or you fall back to copy/paste for that client only).
 
 ---
 
-## Practical operating model (Path A only)
+## Day-to-day use
 
-| Capability | Supported |
+1. Select company (Christie's / McLaren / …)
+2. **Sign in with Microsoft** (once per company until token refresh fails)
+3. Draft from brief or Excel playbook
+4. **Create in Jira as me** or **Update issue as me**
+5. Sign out of that company when done if you want
+
+---
+
+## What this is / isn’t
+
+| | |
 |---|---|
-| Draft authentic tickets from knowledge | Yes |
-| Bulk Excel → many drafts | Yes |
-| Company-isolated memory | Yes |
-| Login to Jira inside this app | No |
-| Create/edit tickets via SSO connection | No — you do that in Jira |
-| Copy summary/description / bulk paste pack | Yes |
-
-Day-to-day value stays high: the hard part is writing consistent tickets; Create in Jira remains a short manual step while you are already signed in with Microsoft.
+| Is | Browser SSO login as you, then API create/edit as your user |
+| Is | Per-company sessions + isolated knowledge |
+| Isn’t | Storing your Microsoft password |
+| Isn’t | Scraping the Jira login form |
+| Isn’t | A shared bot identity (unless you later add a service account) |
 
 ---
 
-## Implication for this prototype
+## Fallback
 
-Access mode is **Manual only**: Microsoft SSO in the browser + copy/paste.  
-No in-app company SSO login for create/edit.
+Copy summary / description / bulk paste pack still exists if OAuth consent is blocked for a specific client.

@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type {
+  AtlassianOAuthTokens,
   CompanySummary,
   CompanyWorkspace,
   ContextMemory,
@@ -34,6 +35,14 @@ function metaPath(slug: string) {
 
 function secretsPath(slug: string) {
   return path.join(workspaceDir(slug), "secrets.json");
+}
+
+function oauthPath(slug: string) {
+  return path.join(workspaceDir(slug), "oauth.json");
+}
+
+function oauthStatePath() {
+  return path.join(WORKSPACES_DIR, "oauth-state.json");
 }
 
 async function ensureDirs() {
@@ -77,25 +86,36 @@ async function loadSecrets(slug: string): Promise<JiraConnectionSecrets | null> 
   return readJson<JiraConnectionSecrets>(secretsPath(slug));
 }
 
+async function loadOAuth(slug: string): Promise<AtlassianOAuthTokens | null> {
+  return readJson<AtlassianOAuthTokens>(oauthPath(slug));
+}
+
 function publicConnection(
   secrets: JiraConnectionSecrets | null,
+  oauth: AtlassianOAuthTokens | null,
   fallback?: JiraConnectionPublic,
 ): JiraConnectionPublic {
-  if (!secrets) {
+  const oauthConnected = Boolean(oauth?.accessToken && oauth?.cloudId);
+  if (!secrets && !oauthConnected) {
     return (
       fallback || {
         baseUrl: "",
         email: "",
         tokenConfigured: false,
+        oauthConnected: false,
         dryRun: true,
       }
     );
   }
   return {
-    baseUrl: secrets.baseUrl,
-    email: secrets.email,
-    tokenConfigured: Boolean(secrets.apiToken),
-    dryRun: secrets.dryRun || !secrets.apiToken,
+    baseUrl: oauth?.siteUrl || secrets?.baseUrl || "",
+    email: oauth?.accountEmail || secrets?.email || "",
+    tokenConfigured: Boolean(secrets?.apiToken),
+    oauthConnected,
+    oauthAccountName: oauth?.accountDisplayName || oauth?.accountEmail,
+    oauthSiteName: oauth?.siteName,
+    // Live when OAuth is connected (Path B). API-token dryRun remains respected if only token exists.
+    dryRun: oauthConnected ? false : secrets ? secrets.dryRun || !secrets.apiToken : true,
   };
 }
 
@@ -112,10 +132,11 @@ async function readCompany(slug: string): Promise<CompanyWorkspace | null> {
   const memory = await readJson<ContextMemory>(memoryPath(slug));
   if (!meta || !memory) return null;
   const secrets = await loadSecrets(slug);
+  const oauth = await loadOAuth(slug);
   return {
     ...meta,
     memory,
-    connection: publicConnection(secrets, meta.connection),
+    connection: publicConnection(secrets, oauth, meta.connection),
   };
 }
 
@@ -253,7 +274,8 @@ export async function saveCompanySecrets(
     dryRun: secrets.dryRun,
   };
   await writeJson(secretsPath(company.slug), normalized);
-  company.connection = publicConnection(normalized);
+  const oauth = await loadOAuth(company.slug);
+  company.connection = publicConnection(normalized, oauth);
   await persistCompany(company);
   return toSummary(company);
 }
@@ -263,6 +285,67 @@ export async function getCompanySecrets(
 ): Promise<JiraConnectionSecrets | null> {
   const company = await getCompany(companyIdOrSlug);
   return loadSecrets(company.slug);
+}
+
+export async function getCompanyOAuth(
+  companyIdOrSlug?: string,
+): Promise<AtlassianOAuthTokens | null> {
+  const company = await getCompany(companyIdOrSlug);
+  return loadOAuth(company.slug);
+}
+
+export async function saveCompanyOAuth(
+  companyIdOrSlug: string,
+  tokens: AtlassianOAuthTokens,
+) {
+  const company = await getCompany(companyIdOrSlug);
+  await writeJson(oauthPath(company.slug), tokens);
+  const secrets = await loadSecrets(company.slug);
+  company.connection = publicConnection(secrets, tokens);
+  await persistCompany(company);
+  return toSummary(company);
+}
+
+export async function clearCompanyOAuth(companyIdOrSlug: string) {
+  const company = await getCompany(companyIdOrSlug);
+  try {
+    await fs.unlink(oauthPath(company.slug));
+  } catch {
+    // ignore missing file
+  }
+  const secrets = await loadSecrets(company.slug);
+  company.connection = publicConnection(secrets, null);
+  await persistCompany(company);
+  return toSummary(company);
+}
+
+export async function saveOAuthNonce(nonceHash: string, companyId: string) {
+  await ensureDirs();
+  const current =
+    (await readJson<Record<string, { companyId: string; createdAt: number }>>(
+      oauthStatePath(),
+    )) || {};
+  const now = Date.now();
+  for (const [key, value] of Object.entries(current)) {
+    if (now - value.createdAt > 15 * 60 * 1000) delete current[key];
+  }
+  current[nonceHash] = { companyId, createdAt: now };
+  await writeJson(oauthStatePath(), current);
+}
+
+export async function consumeOAuthNonce(
+  nonceHash: string,
+): Promise<string | null> {
+  const current =
+    (await readJson<Record<string, { companyId: string; createdAt: number }>>(
+      oauthStatePath(),
+    )) || {};
+  const entry = current[nonceHash];
+  if (!entry) return null;
+  delete current[nonceHash];
+  await writeJson(oauthStatePath(), current);
+  if (Date.now() - entry.createdAt > 15 * 60 * 1000) return null;
+  return entry.companyId;
 }
 
 export async function rememberBrief(

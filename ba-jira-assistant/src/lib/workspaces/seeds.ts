@@ -30,6 +30,7 @@ function connectionStub(): JiraConnectionPublic {
     baseUrl: "",
     email: "",
     tokenConfigured: false,
+    oauthConnected: false,
     dryRun: true,
   };
 }

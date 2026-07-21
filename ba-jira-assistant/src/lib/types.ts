@@ -91,14 +91,32 @@ export type JiraConnectionPublic = {
   baseUrl: string;
   email: string;
   tokenConfigured: boolean;
+  oauthConnected: boolean;
+  oauthAccountName?: string;
+  oauthSiteName?: string;
   dryRun: boolean;
 };
 
+/** Legacy/optional API-token secrets. Prefer OAuth Path B. */
 export type JiraConnectionSecrets = {
   baseUrl: string;
   email: string;
   apiToken: string;
   dryRun: boolean;
+};
+
+/** Per-company Atlassian OAuth session (acts as the signed-in BA). */
+export type AtlassianOAuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  scope: string;
+  cloudId: string;
+  siteUrl: string;
+  siteName: string;
+  accountEmail?: string;
+  accountDisplayName?: string;
+  updatedAt: string;
 };
 
 export type ContextMemory = {

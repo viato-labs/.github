@@ -1,42 +1,107 @@
+import {
+  fetchOAuthIdentity,
+  refreshAccessToken,
+  toStoredTokens,
+} from "@/lib/jira/oauth";
 import { draftToAdf } from "@/lib/templates/ticket-body";
-import type { CreateTicketResult, JiraConnectionSecrets, TicketDraft } from "@/lib/types";
-import { getCompanySecrets } from "@/lib/workspaces/store";
+import type {
+  AtlassianOAuthTokens,
+  CreateTicketResult,
+  JiraConnectionSecrets,
+  TicketDraft,
+} from "@/lib/types";
+import {
+  getCompany,
+  getCompanyOAuth,
+  getCompanySecrets,
+  saveCompanyOAuth,
+} from "@/lib/workspaces/store";
 
 export type JiraConfig = {
-  baseUrl: string;
-  email: string;
-  apiToken: string;
+  mode: "oauth" | "basic" | "none";
   dryRun: boolean;
+  accessToken?: string;
+  cloudId?: string;
+  baseUrl?: string;
+  email?: string;
+  apiToken?: string;
+  accountLabel?: string;
+  siteName?: string;
 };
 
-/** Fallback env credentials (single-tenant). Prefer per-company secrets. */
+function envWantsLive(): boolean {
+  const dryRunEnv = process.env.JIRA_DRY_RUN;
+  return dryRunEnv === "false" || dryRunEnv === "0";
+}
+
 export function getEnvJiraConfig(): JiraConfig {
   const baseUrl = (process.env.JIRA_BASE_URL || "").replace(/\/$/, "");
   const email = process.env.JIRA_EMAIL || "";
   const apiToken = process.env.JIRA_API_TOKEN || "";
-  const dryRunEnv = process.env.JIRA_DRY_RUN;
   const hasCreds = Boolean(baseUrl && email && apiToken);
-  const live = hasCreds && (dryRunEnv === "false" || dryRunEnv === "0");
-
+  if (!hasCreds) {
+    return { mode: "none", dryRun: true };
+  }
   return {
+    mode: "basic",
     baseUrl,
     email,
     apiToken,
-    dryRun: !live,
+    dryRun: !envWantsLive(),
   };
+}
+
+async function ensureFreshOAuth(
+  companyIdOrSlug: string,
+  tokens: AtlassianOAuthTokens,
+): Promise<AtlassianOAuthTokens> {
+  const skewMs = 60_000;
+  if (tokens.expiresAt - skewMs > Date.now()) return tokens;
+  if (!tokens.refreshToken) {
+    throw new Error("OAuth session expired. Sign in with Microsoft again.");
+  }
+
+  const refreshed = await refreshAccessToken(tokens.refreshToken);
+  const next = toStoredTokens({
+    accessToken: refreshed.access_token,
+    refreshToken: refreshed.refresh_token,
+    expiresIn: refreshed.expires_in,
+    scope: refreshed.scope,
+    cloudId: tokens.cloudId,
+    siteUrl: tokens.siteUrl,
+    siteName: tokens.siteName,
+    previous: tokens,
+  });
+  await saveCompanyOAuth(companyIdOrSlug, next);
+  return next;
 }
 
 export async function getJiraConfigForCompany(
   companyIdOrSlug?: string,
 ): Promise<JiraConfig> {
-  const secrets = await getCompanySecrets(companyIdOrSlug);
-  if (secrets?.baseUrl && secrets.email && secrets.apiToken) {
-    const live = !secrets.dryRun;
+  const company = await getCompany(companyIdOrSlug);
+  const oauth = await getCompanyOAuth(company.id);
+  if (oauth?.accessToken && oauth.cloudId) {
+    const fresh = await ensureFreshOAuth(company.id, oauth);
     return {
+      mode: "oauth",
+      dryRun: false,
+      accessToken: fresh.accessToken,
+      cloudId: fresh.cloudId,
+      baseUrl: fresh.siteUrl,
+      accountLabel: fresh.accountDisplayName || fresh.accountEmail,
+      siteName: fresh.siteName,
+    };
+  }
+
+  const secrets = await getCompanySecrets(company.id);
+  if (secrets?.baseUrl && secrets.email && secrets.apiToken) {
+    return {
+      mode: "basic",
       baseUrl: secrets.baseUrl.replace(/\/$/, ""),
       email: secrets.email,
       apiToken: secrets.apiToken,
-      dryRun: !live,
+      dryRun: secrets.dryRun,
     };
   }
   return getEnvJiraConfig();
@@ -47,9 +112,24 @@ export function getJiraConfig(): JiraConfig {
   return getEnvJiraConfig();
 }
 
+function requestUrl(config: JiraConfig, pathname: string): string {
+  if (config.mode === "oauth") {
+    if (!config.cloudId) throw new Error("Missing Jira cloudId for OAuth");
+    return `https://api.atlassian.com/ex/jira/${config.cloudId}${pathname}`;
+  }
+  if (!config.baseUrl) throw new Error("Missing Jira base URL");
+  return `${config.baseUrl}${pathname}`;
+}
+
 function authHeader(config: JiraConfig): string {
-  const token = Buffer.from(`${config.email}:${config.apiToken}`).toString("base64");
-  return `Basic ${token}`;
+  if (config.mode === "oauth") {
+    if (!config.accessToken) throw new Error("Missing OAuth access token");
+    return `Bearer ${config.accessToken}`;
+  }
+  if (!config.email || !config.apiToken) {
+    throw new Error("Missing basic auth credentials");
+  }
+  return `Basic ${Buffer.from(`${config.email}:${config.apiToken}`).toString("base64")}`;
 }
 
 export async function jiraRequest<T>(
@@ -57,7 +137,11 @@ export async function jiraRequest<T>(
   pathname: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${config.baseUrl}${pathname}`, {
+  if (config.mode === "none") {
+    throw new Error("No Jira connection. Sign in with Microsoft first.");
+  }
+
+  const response = await fetch(requestUrl(config, pathname), {
     ...init,
     headers: {
       Accept: "application/json",
@@ -78,11 +162,23 @@ export async function jiraRequest<T>(
 
 export async function probeJira(config: JiraConfig, companyName?: string) {
   const label = companyName ? `${companyName}: ` : "";
-  if (!config.baseUrl || !config.email || !config.apiToken) {
+  if (config.mode === "none") {
     return {
       ok: false,
       dryRun: true,
-      message: `${label}No API credentials (normal for Microsoft SSO corporates). Use manual copy/paste, or add an API token/OAuth if IT allows.`,
+      connected: false,
+      mode: config.mode,
+      message: `${label}Not signed in. Use Sign in with Microsoft to let the app create/edit Jira as you.`,
+    };
+  }
+
+  if (config.dryRun && config.mode === "basic") {
+    return {
+      ok: true,
+      dryRun: true,
+      connected: true,
+      mode: config.mode,
+      message: `${label}API token configured but dry-run is on.`,
     };
   }
 
@@ -91,18 +187,24 @@ export async function probeJira(config: JiraConfig, companyName?: string) {
       config,
       "/rest/api/3/myself",
     );
+    const who = me.displayName || me.emailAddress || config.accountLabel || "you";
     return {
       ok: true,
       dryRun: config.dryRun,
-      message: config.dryRun
-        ? `${label}Connected as ${me.displayName || me.emailAddress}, dry-run enabled.`
-        : `${label}Connected as ${me.displayName || me.emailAddress}. Live creates enabled.`,
+      connected: true,
+      mode: config.mode,
+      message:
+        config.mode === "oauth"
+          ? `${label}Signed in as ${who}${config.siteName ? ` @ ${config.siteName}` : ""}. App can create/edit Jira as you.`
+          : `${label}Connected as ${who}. Live creates ${config.dryRun ? "disabled (dry-run)" : "enabled"}.`,
       user: me,
     };
   } catch (error) {
     return {
       ok: false,
       dryRun: true,
+      connected: false,
+      mode: config.mode,
       message: `${label}${error instanceof Error ? error.message : "Jira probe failed"}`,
     };
   }
@@ -143,7 +245,7 @@ export async function createIssueFromDraft(
     );
   }
 
-  if (resolved.dryRun) {
+  if (resolved.mode === "none" || resolved.dryRun) {
     return {
       dryRun: true,
       companyId: draft.companyId,
@@ -152,7 +254,9 @@ export async function createIssueFromDraft(
       payload,
       warnings: [
         ...warnings,
-        "Dry-run only — no issue was created in Jira for this company login.",
+        resolved.mode === "none"
+          ? "Not signed in — dry-run only. Sign in with Microsoft to create for real."
+          : "Dry-run only — no issue was created in Jira.",
       ],
     };
   }
@@ -189,14 +293,39 @@ export async function createIssuesFromDrafts(
   return results;
 }
 
+export async function updateIssueFromDraft(
+  issueKey: string,
+  draft: TicketDraft,
+  config?: JiraConfig,
+) {
+  const resolved = config || (await getJiraConfigForCompany(draft.companyId));
+  if (resolved.mode === "none" || resolved.dryRun) {
+    throw new Error("Sign in with Microsoft before editing Jira issues.");
+  }
+
+  const fields: Record<string, unknown> = {
+    summary: draft.summary,
+    description: draftToAdf(draft),
+    labels: draft.labels,
+  };
+  if (draft.priority) fields.priority = { name: draft.priority };
+
+  await jiraRequest(resolved, `/rest/api/3/issue/${issueKey}`, {
+    method: "PUT",
+    body: JSON.stringify({ fields }),
+  });
+
+  return { key: issueKey, updated: true };
+}
+
 export async function harvestDorFromIssue(
   issueKey: string,
   config?: JiraConfig,
   companyIdOrSlug?: string,
 ) {
   const resolved = config || (await getJiraConfigForCompany(companyIdOrSlug));
-  if (!resolved.baseUrl || !resolved.apiToken) {
-    throw new Error("Configure this company's Jira credentials before harvesting.");
+  if (resolved.mode === "none") {
+    throw new Error("Sign in with Microsoft before harvesting a golden ticket.");
   }
 
   const issue = await jiraRequest<{
@@ -243,4 +372,8 @@ export function secretsFromBody(body: Partial<JiraConnectionSecrets>): JiraConne
     apiToken: body.apiToken || "",
     dryRun: body.dryRun ?? true,
   };
+}
+
+export async function verifyOAuthSession(tokens: AtlassianOAuthTokens) {
+  return fetchOAuthIdentity(tokens.accessToken, tokens.cloudId);
 }

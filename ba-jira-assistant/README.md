@@ -1,88 +1,54 @@
 # BA Jira Assistant
 
-Multi-company, chat-driven helper that turns a short BA brief (or Excel/CSV) into consistent Jira tickets:
+Multi-company BA ticket studio with **Path B** access:
 
-1. **Product Overview**
-2. **Description** (clear instructions for developers)
-3. **Technical Information** (blank outline for developers)
-4. **QA Acceptance Criteria** in **Gherkin** (`Given` / `When` / `Then`) when relevant
-5. **Definition of Ready** table (company house standard)
+**Sign in with Microsoft (via Atlassian OAuth) → app creates/edits Jira as you.**
 
-Each company workspace (Christie's, McLaren, …) stores its own Jira login, boards, glossary, epics, DoR, and history — no cross-client bleed.
+Each company workspace (Christie's, McLaren, …) keeps its own SSO session, boards, glossary, epics, DoR, and history.
 
-> Investigation: [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md)  
-> Multi-company model: [`docs/MULTI_COMPANY.md`](./docs/MULTI_COMPANY.md)
+> Feasibility: [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md)  
+> Multi-company: [`docs/MULTI_COMPANY.md`](./docs/MULTI_COMPANY.md)  
+> SSO / Path B setup: [`docs/CORPORATE_SSO.md`](./docs/CORPORATE_SSO.md)
 
 ## Quick start
 
 ```bash
 cd ba-jira-assistant
 cp .env.example .env.local
+# fill ATLASSIAN_CLIENT_ID + ATLASSIAN_CLIENT_SECRET
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) → choose company → **Sign in with Microsoft**.
 
-Without credentials the app stays in **dry-run** and still drafts full previews.
+## What you can do
 
-## Multi-company usage
+- Draft from short briefs or Excel/CSV playbooks
+- Create tickets in Jira **as the signed-in BA**
+- Update existing issues by key
+- Keep Christie's and McLaren knowledge fully isolated
+- Fall back to copy/paste if a client blocks OAuth consent
 
-1. Switch company in the header (seeded: **Christie's**, **McLaren**)
-2. Optionally add that company's Jira API token login
-3. Choose a playbook:
-   - `single-brief` — one chat brief → one ticket
-   - `bulk-rows` — each spreadsheet row → one ticket
-   - `field-trip-by-engagement` — Christie's engagement sheet → field tickets
-   - `configurator-design-sections` — McLaren design tickets per section
-4. Paste a brief **or** upload Excel/CSV
-5. Review confidence + preview → create
+## Playbooks
 
-## Access model (Path A only)
+- `single-brief`
+- `bulk-rows`
+- `field-trip-by-engagement` (Christie's)
+- `configurator-design-sections` (McLaren)
 
-Corporate Jira is **Microsoft SSO in your browser**. This app does **not** connect SSO or create/edit tickets for you. See [`docs/CORPORATE_SSO.md`](./docs/CORPORATE_SSO.md).
-
-1. Sign into Jira with Microsoft yourself
-2. Draft tickets here (briefs / Excel / company knowledge)
-3. Copy summary + description (or download a bulk paste pack)
-4. Create/edit the issue in Jira
-
-Do **not** share Microsoft passwords with the assistant. OAuth/API create is out of scope for this deployment.
-
-## Example briefs
-
-Christie's:
-
-```text
-Buyers need to save a lot from search results on web.
-Epic: Discovery
-Priority: High
-Users can save and see it in My Lots.
-```
-
-McLaren knowledge bulk:
-
-1. Select McLaren
-2. Playbook: Configurator design sections
-3. Click **Draft design tickets from knowledge**
-
-## API surface
+## Auth routes
 
 | Route | Purpose |
 |---|---|
-| `GET/POST/PATCH /api/companies` | List / add / switch company |
-| `POST /api/companies/credentials` | Save per-company Jira login |
-| `POST /api/chat` | Store brief + draft ticket |
-| `POST /api/tickets/preview` | Markdown preview |
-| `POST /api/tickets/create` | Create one or many drafts |
-| `POST /api/tickets/bulk` | Spreadsheet / knowledge playbooks |
-| `POST /api/tickets/harvest-dor` | Pull DoR table from a golden ticket |
-| `GET/PATCH /api/context` | Company memory updates |
-| `GET /api/jira/status` | Connection / dry-run status |
+| `GET /api/auth/atlassian/start?companyId=` | Begin Microsoft/Atlassian SSO |
+| `GET /api/auth/atlassian/callback` | OAuth callback |
+| `GET /api/auth/atlassian/status` | Connection status |
+| `POST /api/auth/atlassian/logout` | Clear company session |
 
-## Important constraints
+## Important
 
-- One login + knowledge base per company — never mix client standards
-- Prefer API token / OAuth / service account — not SSO password sharing
-- Company-managed Jira may need Epic Link `customfield_#####` calibration
-- For Cursor-native create/search, prefer org-approved / Runlayer-managed MCP over ad-hoc shadow MCPs
+- Do **not** paste Microsoft passwords into the app
+- OAuth app needs `offline_access` for refresh tokens
+- Client IT may need to allow the Atlassian OAuth app
+- Prefer org-approved / Runlayer-managed MCP if using Cursor connectors later

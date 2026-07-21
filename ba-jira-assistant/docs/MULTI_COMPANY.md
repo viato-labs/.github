@@ -71,16 +71,16 @@ Each draft gets a confidence score from:
 
 Use dry-run until confidence + house style look right. Then disable dry-run on that company's login only.
 
-## Auth guidance (corporate default)
+## Auth guidance (Path B)
 
-Most companies will only give **Microsoft SSO browser access**, not API tokens. Full detail: [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
+Use **Sign in with Microsoft** (Atlassian OAuth) per company. Full detail: [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
 
 | Do | Don't |
 |---|---|
-| Default to **manual copy/paste** while signed into each company's Jira via Microsoft | Expect to hand over a Microsoft password for automation |
-| Keep one workspace + knowledge base per company | Share one login or memory across clients |
-| Ask IT later for approved **OAuth SSO consent** if you want one-click create | Automate the Microsoft login form / MFA |
-| Keep API token fields optional for the rare client that allows them | Copy Christie's DoR into McLaren memory |
+| Sign in separately for Christie's / McLaren / etc. | Share one OAuth session across clients |
+| Keep one workspace + knowledge base per company | Paste Microsoft passwords into the app |
+| Allowlist the Atlassian OAuth app with IT if consent is blocked | Automate the Microsoft login form / MFA |
+| Fall back to copy/paste only when OAuth is blocked | Copy Christie's DoR into McLaren memory |
 
 ## APIs
 
