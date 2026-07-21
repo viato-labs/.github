@@ -4,22 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ticket Flow</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;550;650;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="panel.css" />
   </head>
   <body>
     <header class="top">
-      <div>
-        <strong>Ticket Flow</strong>
-        <small>Chrome agent · your Jira login</small>
+      <div class="brand-mini">
+        <span class="mark material-symbols-outlined">auto_awesome</span>
+        <div>
+          <strong>Ticket Flow</strong>
+          <small>Portal · your Jira login</small>
+        </div>
       </div>
-      <button id="btn-open" type="button" class="create">Open Jira</button>
+      <button id="btn-open" type="button" class="create">
+        <span class="material-symbols-outlined">open_in_new</span>
+        Open Jira
+      </button>
     </header>
 
     <div class="layout">
       <aside class="rail">
         <p class="label">Accounts</p>
         <div id="account-list" class="account-list"></div>
-        <button id="btn-add-toggle" type="button" class="link">+ Add company</button>
+        <button id="btn-add-toggle" type="button" class="link">
+          <span class="material-symbols-outlined">add_business</span>
+          Add company
+        </button>
         <form id="add-form" class="add-form hidden">
           <input id="add-name" placeholder="Company name" required />
           <input id="add-url" placeholder="https://company.atlassian.net" required />
@@ -29,16 +42,27 @@
       </aside>
 
       <main class="main">
+        <section class="hero-mini">
+          <p class="kicker">
+            <span class="material-symbols-outlined">menu_book</span>
+            Magazine desk → board
+          </p>
+          <h1>Write it like you.</h1>
+          <p class="hero-sub">Drop guidance. Research. Create as your logged-in self.</p>
+        </section>
+
         <label class="field">
-          <span>Jira URL</span>
+          <span><span class="material-symbols-outlined">link</span> Jira URL</span>
           <div class="row">
             <input id="jira-url" placeholder="https://christies.atlassian.net" />
-            <button id="btn-save-url" type="button" class="ghost">Save</button>
+            <button id="btn-save-url" type="button" class="ghost">
+              <span class="material-symbols-outlined">save</span>
+            </button>
           </div>
         </label>
 
         <label class="field">
-          <span>Tickets are for</span>
+          <span><span class="material-symbols-outlined">groups</span> Tickets are for</span>
           <select id="audience">
             <option value="both">Dev + QA</option>
             <option value="dev">Developers</option>
@@ -48,23 +72,32 @@
         </label>
 
         <label class="field">
-          <span>Guidance</span>
+          <span><span class="material-symbols-outlined">edit_note</span> Guidance</span>
           <textarea
             id="guidance"
             rows="7"
-            placeholder="Paste the brief, notes, or “turn this into tickets”. Add Figma/Confluence links below. I’ll write like you, using existing Jira + Confluence context."
+            placeholder="Paste the brief, notes, or “turn this into tickets”. Add Figma/Confluence links below."
           ></textarea>
         </label>
 
         <label class="field">
-          <span>Links (Figma, Confluence, docs)</span>
+          <span><span class="material-symbols-outlined">link</span> Links</span>
           <textarea id="links" rows="3" placeholder="One URL per line"></textarea>
         </label>
 
         <div class="actions">
-          <button id="btn-session" type="button" class="ghost">Check login</button>
-          <button id="btn-draft" type="button" class="primary">Research & draft</button>
-          <button id="btn-create" type="button" class="primary" disabled>Create in Jira</button>
+          <button id="btn-session" type="button" class="ghost">
+            <span class="material-symbols-outlined">verified_user</span>
+            Check login
+          </button>
+          <button id="btn-draft" type="button" class="primary">
+            <span class="material-symbols-outlined">travel_explore</span>
+            Research & draft
+          </button>
+          <button id="btn-create" type="button" class="primary" disabled>
+            <span class="material-symbols-outlined">publish</span>
+            Create
+          </button>
         </div>
 
         <div id="out" class="out" aria-live="polite"></div>

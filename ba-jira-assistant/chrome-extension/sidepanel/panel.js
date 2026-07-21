@@ -84,9 +84,12 @@ function renderAccounts() {
     btn.type = "button";
     btn.className = "account";
     btn.dataset.active = String(account.id === state.activeAccountId);
+    const active = account.id === state.activeAccountId;
     btn.innerHTML = `<span class="avatar" style="background:${account.color}">${initials(
       account.name,
-    )}</span><span>${account.name}</span>`;
+    )}</span><span class="account-copy"><strong>${account.name}</strong></span><span class="account-chev material-symbols-outlined">${
+      active ? "check_circle" : "chevron_right"
+    }</span>`;
     btn.addEventListener("click", async () => {
       const result = await executeTool("switch_account", { account: account.id });
       jiraUrlEl.value = result.account?.jiraUrl || "";

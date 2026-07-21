@@ -23,7 +23,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Ticket Flow",
   description:
-    "A calm, step-by-step BA assistant for drafting authentic Jira tickets.",
+    "A portal for BAs — guidance in, authentic Jira tickets out, in your voice.",
 };
 
 export default function RootLayout({
@@ -38,6 +38,12 @@ export default function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         className={`${dmSans.variable} ${instrumentSerif.variable} ${plexMono.variable}`}
         style={bodyStyle}
