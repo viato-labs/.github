@@ -22,8 +22,8 @@
 | Microsoft SSO login per company | **Ready (Path B)** | Sign in with Microsoft via Atlassian OAuth |
 | Create tickets once logged in | **Ready** | Create / bulk create / update by key |
 | Org-specific ticket format | **Ready to calibrate** | Template + per-company DoR/glossary/epics; you supply golden tickets to lock style |
-| Knowledge base of historical tickets | **Partial** | Local per-company memory + seeded refs; upload/paste exemplars now |
-| Search Confluence + past Jira to learn | **Not yet** | Next build: Jira/Confluence search after SSO to harvest style + context |
+| Knowledge base of historical tickets | **Ready** | Grows automatically from search + your creates; per company |
+| Search Confluence + past Jira to learn | **Ready** | After Microsoft sign-in, each draft searches Jira + Confluence and stores hits |
 | Excel → one ticket per row | **Ready** | Playbook `field-trip-by-engagement` |
 | Engagement rows → SCO + BAU epic | **Ready (seeded)** | Titles prefixed `[SCO]`, epic mapped to `BAU` (replace key with real BAU epic) |
 | McLaren configurator design tickets | **Ready** | Playbook `configurator-design-sections` from outline/knowledge |
@@ -71,8 +71,19 @@ Per company:
 
 ---
 
-## Next capability slice (when you want it)
+## Example: new Christie's calendar feature
 
-1. After SSO: search recent Jira issues in that company and learn phrasing/DoR  
-2. Confluence page fetch/search for product context  
-3. Stronger PDF/image extraction into ticket evidence sections  
+1. Sign into Christie's with Microsoft  
+2. Brief: “Create a ticket for a new calendar feature on web…”  
+3. Assistant searches Christie's Jira + Confluence for calendar/related feature context  
+4. Draft includes continuity notes + related issue/page references  
+5. Historical memory updates so later tickets get smarter  
+6. Create in Jira as you  
+
+It knows this is a **new** ticket, written in house style and connected to how existing features work.
+
+## Next capability slice
+
+1. Stronger PDF/image extraction into ticket evidence sections  
+2. Deeper Confluence page body fetch (beyond search excerpts)  
+3. Auto-harvest DoR tables from top matching golden tickets  

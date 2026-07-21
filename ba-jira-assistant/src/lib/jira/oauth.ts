@@ -9,6 +9,9 @@ export const ATLASSIAN_SCOPES = [
   "read:jira-work",
   "write:jira-work",
   "read:jira-user",
+  "read:confluence-content.all",
+  "read:confluence-space.summary",
+  "search:confluence",
   "offline_access",
 ].join(" ");
 
@@ -189,6 +192,7 @@ export function toStoredTokens(input: {
   expiresIn: number;
   scope?: string;
   cloudId: string;
+  confluenceCloudId?: string;
   siteUrl: string;
   siteName: string;
   accountEmail?: string;
@@ -202,6 +206,10 @@ export function toStoredTokens(input: {
     expiresAt: Date.now() + input.expiresIn * 1000,
     scope: input.scope || input.previous?.scope || ATLASSIAN_SCOPES,
     cloudId: input.cloudId,
+    confluenceCloudId:
+      input.confluenceCloudId ||
+      input.previous?.confluenceCloudId ||
+      input.cloudId,
     siteUrl: input.siteUrl,
     siteName: input.siteName,
     accountEmail: input.accountEmail || input.previous?.accountEmail,

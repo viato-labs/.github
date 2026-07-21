@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   CompanySummary,
   PlaybookId,
+  ResearchBundle,
   TicketDraft,
 } from "@/lib/types";
 
@@ -65,6 +66,7 @@ export default function Home() {
   const [showCompanies, setShowCompanies] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [editKey, setEditKey] = useState("");
+  const [research, setResearch] = useState<ResearchBundle | null>(null);
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
@@ -115,7 +117,7 @@ export default function Home() {
           id: "welcome",
           role: "assistant",
           createdAt: new Date().toISOString(),
-          content: `Working in **${companyData.company.name}**. Path B: click **Sign in with Microsoft** to authorize this app to create/edit Jira tickets as you (browser SSO + MFA). No password is stored here.`,
+          content: `Working in **${companyData.company.name}**. Path B: **Sign in with Microsoft**, then drafts search that company's Jira + Confluence and remember historical style/context so a new ticket (e.g. calendar) connects to how existing features work.`,
         },
       ]);
       setPlaybookId(
@@ -163,6 +165,7 @@ export default function Home() {
       setBulkDrafts([]);
       setBulkSummaries([]);
       setPreview("");
+      setResearch(null);
       const company = nextCompanies.find((c) => c.id === companyId);
       setPlaybookId(
         (company?.playbooks?.[0]?.id as PlaybookId) || "single-brief",
@@ -235,6 +238,7 @@ export default function Home() {
       });
       const data = await response.json();
       setDraft(data.draft);
+      setResearch(data.research || null);
       setBulkDrafts([]);
       setBulkSummaries([]);
       setMessages((prev) => [
@@ -243,8 +247,8 @@ export default function Home() {
           id: uid(),
           role: "assistant",
           content: signedIn
-            ? `${data.reply}\n\nSigned in — you can create this ticket in Jira as you.`
-            : `${data.reply}\n\nNot signed in yet — Sign in with Microsoft, or copy/paste manually.`,
+            ? `${data.reply}\n\nSigned in — researched Jira/Confluence, updated company memory, and you can create this ticket as you.`
+            : `${data.reply}\n\nNot signed in yet — Sign in with Microsoft to unlock live Jira/Confluence research, or copy/paste manually.`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -722,6 +726,22 @@ export default function Home() {
                 ? `Acting as ${authStatus?.connection?.oauthAccountName || "you"} on ${authStatus?.connection?.oauthSiteName || "Jira"}.`
                 : "Sign in with Microsoft to create/edit as you."}
             </div>
+            {research ? (
+              <div>
+                Research: {research.jiraHits.length} Jira ·{" "}
+                {research.confluenceHits.length} Confluence
+                <ul>
+                  {research.jiraHits.slice(0, 4).map((hit) => (
+                    <li key={hit.id}>
+                      Jira {hit.id}: {hit.title}
+                    </li>
+                  ))}
+                  {research.confluenceHits.slice(0, 3).map((hit) => (
+                    <li key={`c-${hit.id}`}>Confluence: {hit.title}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {bulkSummaries.length ? (
               <div>
                 Bulk queue ({bulkSummaries.length}):

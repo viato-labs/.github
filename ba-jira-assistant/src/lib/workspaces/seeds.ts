@@ -51,6 +51,8 @@ function baseMemory(defaults: Partial<ContextMemory> = {}): ContextMemory {
     ],
     sections: [],
     historicalTickets: [],
+    confluencePages: [],
+    researchQueries: [],
     briefs: [],
     createdTickets: [],
     ...defaults,

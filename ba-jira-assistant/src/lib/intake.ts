@@ -348,6 +348,18 @@ export function buildAssistantReply(
       ? "Core BA fields look filled enough for autonomous create."
       : `Still thin on: ${draft.missingFields.join(", ")}.`;
 
+  const research = draft.research;
+  const researchLines = research
+    ? [
+        `- Live Jira matches: ${research.jiraHits.length}`,
+        `- Live Confluence matches: ${research.confluenceHits.length}`,
+        `- ${research.contextSummary}`,
+      ]
+    : [
+        `- Historical refs in memory: ${company.memory.historicalTickets.length}`,
+        `- Confluence pages in memory: ${company.memory.confluencePages?.length || 0}`,
+      ];
+
   return [
     `Drafted a **${draft.intent}** ticket for **${company.name}** (confidence ${Math.round(draft.confidence * 100)}%):`,
     "",
@@ -356,10 +368,10 @@ export function buildAssistantReply(
     `- Epic: ${draft.epicName || "unmapped"}${draft.epicKey ? ` (${draft.epicKey})` : ""}`,
     `- Labels: ${draft.labels.join(", ") || "none"}`,
     `- Gherkin scenarios: ${draft.gherkin.length}`,
-    `- Historical refs available in this company: ${company.memory.historicalTickets.length}`,
+    ...researchLines,
     "",
     gaps,
     "",
-    "Knowledge stays isolated to this company. Switch company to use McLaren vs Christie's memory/logins independently.",
+    "This is treated as a **new** ticket, written with contextual continuity from that company's Jira/Confluence/history — not a copy of an old ticket.",
   ].join("\n");
 }

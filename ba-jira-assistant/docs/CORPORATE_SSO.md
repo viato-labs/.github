@@ -27,7 +27,12 @@ Someone (you or Viato) creates an OAuth 2.0 (3LO) app in the
    - `read:jira-work`
    - `write:jira-work`
    - `read:jira-user`
+   - `read:confluence-content.all`
+   - `read:confluence-space.summary`
+   - `search:confluence`
    - `offline_access` (refresh token — required)
+
+   If you already signed in before Confluence scopes were added, sign out and sign in again so consent includes search.
 4. Copy Client ID + Client Secret into `.env.local`:
 
 ```env

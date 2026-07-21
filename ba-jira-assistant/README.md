@@ -25,6 +25,7 @@ Open [http://localhost:3000](http://localhost:3000) → choose company → **Sig
 ## What you can do
 
 - Draft from short briefs or Excel/CSV playbooks
+- After sign-in: **search Jira + Confluence** and grow historical memory
 - Create tickets in Jira **as the signed-in BA**
 - Update existing issues by key
 - Keep Christie's and McLaren knowledge fully isolated

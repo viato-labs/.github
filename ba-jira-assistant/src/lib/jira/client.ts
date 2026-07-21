@@ -68,6 +68,7 @@ async function ensureFreshOAuth(
     expiresIn: refreshed.expires_in,
     scope: refreshed.scope,
     cloudId: tokens.cloudId,
+    confluenceCloudId: tokens.confluenceCloudId,
     siteUrl: tokens.siteUrl,
     siteName: tokens.siteName,
     previous: tokens,

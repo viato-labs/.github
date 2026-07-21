@@ -61,6 +61,7 @@ function toSummary(company: CompanyWorkspace): CompanySummary {
       briefs: company.memory.briefs.length,
       createdTickets: company.memory.createdTickets.length,
       historicalTickets: company.memory.historicalTickets.length,
+      confluencePages: company.memory.confluencePages?.length || 0,
       epics: Object.keys(company.memory.epicMap).length,
       glossaryTerms: Object.keys(company.memory.productGlossary).length,
       sections: company.memory.sections.length,
@@ -131,6 +132,9 @@ async function readCompany(slug: string): Promise<CompanyWorkspace | null> {
   const meta = await readJson<Omit<CompanyWorkspace, "memory">>(metaPath(slug));
   const memory = await readJson<ContextMemory>(memoryPath(slug));
   if (!meta || !memory) return null;
+  if (!memory.confluencePages) memory.confluencePages = [];
+  if (!memory.researchQueries) memory.researchQueries = [];
+  if (!memory.historicalTickets) memory.historicalTickets = [];
   const secrets = await loadSecrets(slug);
   const oauth = await loadOAuth(slug);
   return {

@@ -55,17 +55,35 @@ export async function GET(request: Request) {
       );
     }
 
-    // Prefer a resource whose name/url vaguely matches company name; else first.
-    const preferred =
+    const namedMatch = (resource: (typeof resources)[number]) =>
+      `${resource.name} ${resource.url}`
+        .toLowerCase()
+        .includes(company.name.toLowerCase().split(/\s+/)[0] || "");
+
+    const jiraResource =
+      resources.find(
+        (resource) =>
+          namedMatch(resource) &&
+          resource.scopes.some((scope) => scope.includes("jira")),
+      ) ||
       resources.find((resource) =>
-        `${resource.name} ${resource.url}`
-          .toLowerCase()
-          .includes(company.name.toLowerCase().split(/\s+/)[0] || ""),
-      ) || resources[0];
+        resource.scopes.some((scope) => scope.includes("jira")),
+      ) ||
+      resources[0];
+
+    const confluenceResource =
+      resources.find(
+        (resource) =>
+          namedMatch(resource) &&
+          resource.scopes.some((scope) => scope.includes("confluence")),
+      ) ||
+      resources.find((resource) =>
+        resource.scopes.some((scope) => scope.includes("confluence")),
+      );
 
     const identity = await fetchOAuthIdentity(
       tokenResponse.access_token,
-      preferred.id,
+      jiraResource.id,
     );
 
     const tokens = toStoredTokens({
@@ -73,9 +91,10 @@ export async function GET(request: Request) {
       refreshToken: tokenResponse.refresh_token,
       expiresIn: tokenResponse.expires_in,
       scope: tokenResponse.scope,
-      cloudId: preferred.id,
-      siteUrl: preferred.url,
-      siteName: preferred.name,
+      cloudId: jiraResource.id,
+      confluenceCloudId: confluenceResource?.id || jiraResource.id,
+      siteUrl: jiraResource.url,
+      siteName: jiraResource.name,
       accountEmail: identity.emailAddress,
       accountDisplayName: identity.displayName,
     });

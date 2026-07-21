@@ -53,6 +53,7 @@ export type TicketDraft = {
   confidence: number;
   playbookId?: string;
   sourceRow?: Record<string, string>;
+  research?: ResearchBundle;
 };
 
 export type HistoricalTicketRef = {
@@ -61,7 +62,43 @@ export type HistoricalTicketRef = {
   intent?: TicketIntent;
   section?: string;
   notes?: string;
+  snippet?: string;
+  url?: string;
+  labels?: string[];
+  issueType?: string;
+  updatedAt?: string;
   capturedAt: string;
+  source?: "jira-search" | "manual" | "seed";
+};
+
+export type ConfluencePageRef = {
+  id: string;
+  title: string;
+  spaceKey?: string;
+  url?: string;
+  snippet?: string;
+  capturedAt: string;
+  source?: "confluence-search" | "manual";
+};
+
+export type ResearchHit = {
+  kind: "jira" | "confluence";
+  id: string;
+  title: string;
+  url?: string;
+  snippet: string;
+  score?: number;
+};
+
+export type ResearchBundle = {
+  query: string;
+  companyId: string;
+  searchedAt: string;
+  jiraHits: ResearchHit[];
+  confluenceHits: ResearchHit[];
+  relatedHistorical: HistoricalTicketRef[];
+  styleNotes: string[];
+  contextSummary: string;
 };
 
 export type PlaybookId =
@@ -112,6 +149,7 @@ export type AtlassianOAuthTokens = {
   expiresAt: number;
   scope: string;
   cloudId: string;
+  confluenceCloudId?: string;
   siteUrl: string;
   siteName: string;
   accountEmail?: string;
@@ -130,6 +168,13 @@ export type ContextMemory = {
   houseStyleNotes: string[];
   sections: string[];
   historicalTickets: HistoricalTicketRef[];
+  confluencePages: ConfluencePageRef[];
+  researchQueries: Array<{
+    query: string;
+    searchedAt: string;
+    jiraCount: number;
+    confluenceCount: number;
+  }>;
   briefs: Array<{
     id: string;
     createdAt: string;
@@ -168,6 +213,7 @@ export type CompanySummary = {
     briefs: number;
     createdTickets: number;
     historicalTickets: number;
+    confluencePages: number;
     epics: number;
     glossaryTerms: number;
     sections: number;
