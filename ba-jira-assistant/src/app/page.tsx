@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { CompanySummary, ResearchBundle, TicketDraft } from "@/lib/types";
 import type { TicketAudience } from "@/lib/guidance/draft";
 
@@ -58,6 +58,32 @@ const AUDIENCE_OPTIONS: Array<{
 ];
 
 const COLORS = ["#6554C0", "#0B5FFF", "#00875A", "#FF5630", "#00A3BF", "#FF8B00"];
+
+/** UK headquarters hero imagery (Wikimedia Commons, CC BY-SA). */
+const HQ_HEROES: Record<
+  string,
+  { image: string; place: string; position: string }
+> = {
+  christies: {
+    image:
+      "https://upload.wikimedia.org/wikipedia/commons/2/2a/Christie%27s_King_Street.jpg",
+    place: "Christie's · King Street, London",
+    position: "center 28%",
+  },
+  mclaren: {
+    image:
+      "https://upload.wikimedia.org/wikipedia/commons/4/4c/McLaren_Technology_Centre%2C_Woking_-_geograph.org.uk_-_1836979.jpg",
+    place: "McLaren Technology Centre · Woking",
+    position: "center 55%",
+  },
+};
+
+const DEFAULT_HQ = {
+  image:
+    "https://upload.wikimedia.org/wikipedia/commons/2/2a/Christie%27s_King_Street.jpg",
+  place: "UK headquarters",
+  position: "center 35%",
+};
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -357,6 +383,9 @@ export default function Home() {
           ? "draft"
           : "hourglass_empty";
 
+  const hq =
+    (activeCompany && HQ_HEROES[activeCompany.slug]) || DEFAULT_HQ;
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -446,12 +475,21 @@ export default function Home() {
           </div>
         ) : null}
 
-        <section className="portal-hero">
-          <div className="portal-hero-media" aria-hidden />
+        <section className="portal-hero" data-hq={activeCompany?.slug || "default"}>
+          <div
+            className="portal-hero-media"
+            aria-hidden
+            style={
+              {
+                "--hq-image": `url("${hq.image}")`,
+                "--hq-position": hq.position,
+              } as CSSProperties
+            }
+          />
           <div className="portal-hero-content">
             <p className="portal-kicker">
-              <Icon name="auto_awesome" />
-              Ticket Flow
+              <Icon name="location_on" />
+              {hq.place}
             </p>
             <h1>
               Drop guidance.

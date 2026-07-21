@@ -46,9 +46,11 @@
   --font-body: "DM Sans", system-ui, sans-serif;
   --background: var(--bg-0);
   --foreground: var(--ink);
-  --img-atelier: url("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80");
-  --img-portal: url("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1400&q=80");
-  --img-craft: url("https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80");
+  /* UK HQ defaults — overridden per company on the hero */
+  --img-hq-christies: url("https://upload.wikimedia.org/wikipedia/commons/2/2a/Christie%27s_King_Street.jpg");
+  --img-hq-mclaren: url("https://upload.wikimedia.org/wikipedia/commons/4/4c/McLaren_Technology_Centre%2C_Woking_-_geograph.org.uk_-_1836979.jpg");
+  --hq-image: var(--img-hq-christies);
+  --hq-position: center 28%;
 }
 
 @theme inline {
@@ -357,12 +359,19 @@ code {
 .portal-hero-media {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(120deg, rgba(7, 8, 12, 0.82) 12%, rgba(7, 8, 12, 0.45) 55%, rgba(7, 8, 12, 0.7) 100%),
-    var(--img-atelier);
+  background-image:
+    linear-gradient(
+      115deg,
+      rgba(7, 8, 12, 0.88) 8%,
+      rgba(7, 8, 12, 0.55) 48%,
+      rgba(7, 8, 12, 0.72) 100%
+    ),
+    var(--hq-image);
   background-size: cover;
-  background-position: center 40%;
-  transform: scale(1.04);
+  background-position: var(--hq-position);
+  transform: scale(1.03);
   animation: ken-burns 28s ease-in-out infinite alternate;
+  transition: background-image 420ms ease, background-position 420ms ease;
 }
 
 .portal-hero-content {

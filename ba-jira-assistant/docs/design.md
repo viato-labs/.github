@@ -80,6 +80,15 @@ Hero uses italic serif emphasis (`em`) for the human line.
 
 Use photography **only** in the portal hero/banner. Functional areas (setup, guidance, drafts, context) stay clear tonal panels with icons — no decorative images.
 
+Hero switches to each company’s **UK headquarters**:
+
+| Company | Place | Source |
+|---|---|---|
+| Christie's | King Street, St James’s, London | [Wikimedia](https://commons.wikimedia.org/wiki/File:Christie%27s_King_Street.jpg) (CC BY-SA 4.0) |
+| McLaren | Technology Centre, Woking | [Wikimedia / Geograph](https://commons.wikimedia.org/wiki/File:McLaren_Technology_Centre,_Woking_-_geograph.org.uk_-_1836979.jpg) (CC BY-SA 2.0) |
+
+Kicker label shows the place name when the account changes.
+
 ### 2.5 Icons (Material Symbols)
 
 | Context | Icon examples |
