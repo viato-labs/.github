@@ -43,15 +43,26 @@ function rowToBrief(
     })
     .map(([key, value]) => `${key}: ${value}`);
 
-  const lines = [
-    `Title: ${title}`,
-    `Intent hint: ${playbook.defaultIntent}`,
-    `Company: ${company.name}`,
+  const epicLine =
     playbook.id === "field-trip-by-engagement"
-      ? "Epic: Field Ops"
+      ? "Epic: BAU"
       : playbook.id === "configurator-design-sections"
         ? "Epic: Configurator"
-        : "",
+        : "";
+
+  const titleLine =
+    playbook.id === "field-trip-by-engagement"
+      ? `Title: [SCO] ${title}`
+      : `Title: ${title}`;
+
+  const lines = [
+    titleLine,
+    `Intent hint: ${playbook.defaultIntent}`,
+    `Company: ${company.name}`,
+    epicLine,
+    playbook.id === "field-trip-by-engagement"
+      ? "Labels: sco, engagement, bau"
+      : "",
     bodyBits.length ? `Details:\n${bodyBits.join("\n")}` : "",
     leftover.length ? `Additional columns:\n${leftover.join("\n")}` : "",
   ].filter(Boolean);

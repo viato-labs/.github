@@ -85,9 +85,9 @@ export function seedChristies(): CompanyWorkspace {
       ...SHARED_PLAYBOOKS,
       {
         id: "field-trip-by-engagement",
-        name: "Field trip by engagement",
+        name: "Engagement → SCO tickets (BAU)",
         description:
-          "Excel/CSV of engagements → one ticket per row for Christie's field ops.",
+          "Filtered engagement Excel/CSV → one SCO ticket per row, mapped to the BAU epic.",
         defaultIntent: "field-ops",
         rowTitleFields: [
           "engagement",
@@ -95,6 +95,7 @@ export function seedChristies(): CompanyWorkspace {
           "client",
           "title",
           "summary",
+          "sco",
         ],
         rowBodyFields: [
           "location",
@@ -104,24 +105,30 @@ export function seedChristies(): CompanyWorkspace {
           "description",
           "contact",
           "region",
+          "sco type",
+          "priority",
         ],
       },
     ],
     connection: connectionStub(),
     memory: baseMemory({
-      defaultProjectKey: "WEB",
-      defaultLabels: ["ba-assisted", "christies"],
+      defaultProjectKey: "FIELD",
+      defaultLabels: ["ba-assisted", "christies", "sco"],
       productGlossary: {
         lot: "An auction item available for bidding or purchase",
         "my lots": "Signed-in collector area for saved / followed lots",
         consignor: "Party consigning property for sale",
         engagement: "Client/field engagement used for planning visits and actions",
+        sco: "Special Client / field engagement operational ticket type used in BAU",
+        bau: "Business-as-usual epic for recurring engagement / field work",
       },
       epicMap: {
         Discovery: "EPIC-100",
         Checkout: "EPIC-200",
         "My Account": "EPIC-300",
         "Field Ops": "EPIC-400",
+        BAU: "EPIC-BAU",
+        SCO: "EPIC-BAU",
       },
       sections: ["Search", "Lot page", "My Lots", "Checkout", "Account"],
       historicalTickets: [
