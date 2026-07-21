@@ -30,15 +30,16 @@ Fidelity is then a template problem, not an API limitation.
 
 ---
 
-## Access options (Path B chosen)
+## Access options (Path C recommended)
 
-Corporate estates often block API tokens. Path B uses **Atlassian OAuth 2.0 (3LO)** so you sign in with **Microsoft SSO + MFA in the browser**, then the app creates/edits Jira **as you**. See [`CORPORATE_SSO.md`](./CORPORATE_SSO.md).
+Corporate estates often block API tokens. The easiest day-to-day path is a **Chrome extension agent** that reuses the Jira tab you already signed into with Microsoft SSO. See [`CHROME_AGENT.md`](./CHROME_AGENT.md).
 
 | Approach | Status here | Notes |
 |---|---|---|
-| **OAuth 2.0 (3LO) “Sign in with Microsoft/Atlassian”** | **Chosen (Path B)** | No API token. Browser SSO consent. Per-company sessions. |
-| **Manual draft + copy/paste** | Fallback | If a client blocks OAuth app consent. |
-| **Atlassian Rovo MCP** | Optional later | Same SSO idea inside Cursor; prefer org-approved / Runlayer-managed MCP. |
+| **Chrome agent (session cookies on open Jira tab)** | **Recommended (Path C)** | No Cursor plugin. Side-panel tools: draft/create/search/move. Per-company account switcher. |
+| **OAuth 2.0 (3LO) web app** | Available (Path B) | Next.js site; Atlassian consent then Microsoft SSO. See [`CORPORATE_SSO.md`](./CORPORATE_SSO.md). |
+| **Manual draft + copy/paste** | Fallback | Always available from both paths. |
+| **Atlassian Rovo MCP** | Optional later | Cursor-side; prefer org-approved / Runlayer-managed MCP. |
 | **Email + API token** | Optional legacy | Often blocked. |
 | **Sharing Microsoft password / automating the login form** | No | Do not do this. |
 

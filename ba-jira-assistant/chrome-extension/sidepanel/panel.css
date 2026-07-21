@@ -1,0 +1,279 @@
+:root {
+  --blue: #0b5fff;
+  --blue-deep: #0847c7;
+  --ink: #172b4d;
+  --soft: #5e6c84;
+  --faint: #7a869a;
+  --canvas: #f4f5f7;
+  --line: #ebecf0;
+  --surface: #fff;
+  font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--blue);
+  color: #fff;
+}
+
+.brand {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.mark {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.brand strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.brand small {
+  display: block;
+  opacity: 0.8;
+  font-size: 0.72rem;
+}
+
+.create {
+  border: 0;
+  background: #fff;
+  color: var(--blue);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  min-height: 0;
+}
+
+.accounts {
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.65rem 0.55rem;
+  overflow: auto;
+}
+
+.accounts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.accounts-head h2 {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.accounts-head button {
+  border: 0;
+  background: rgba(11, 95, 255, 0.1);
+  color: var(--blue-deep);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+
+.account-list {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.account {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  padding: 0.4rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account[data-active="true"] {
+  border-color: var(--line);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.08);
+}
+
+.avatar {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 750;
+  display: grid;
+  place-items: center;
+}
+
+.account span {
+  font-size: 0.78rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-form {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.add-form.hidden {
+  display: none;
+}
+
+.add-form input,
+.composer textarea {
+  width: 100%;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+  font: inherit;
+}
+
+.add-form button {
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.45rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.session {
+  margin: 0.75rem 0 0;
+  font-size: 0.72rem;
+  color: var(--faint);
+  line-height: 1.35;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chat {
+  flex: 1;
+  overflow: auto;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+}
+
+.bubble {
+  max-width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  font-size: 0.88rem;
+  animation: rise 220ms ease both;
+}
+
+.bubble.user {
+  background: rgba(11, 95, 255, 0.1);
+  color: var(--ink);
+  justify-self: end;
+}
+
+.bubble.assistant {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  background: #fff;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.composer-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+button.ghost,
+button.primary {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+button.ghost {
+  background: var(--canvas);
+  color: var(--soft);
+}
+
+button.primary {
+  background: var(--blue);
+  color: #fff;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

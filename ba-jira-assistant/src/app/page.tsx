@@ -838,6 +838,12 @@ export default function Home() {
         </aside>
 
         <main className="main">
+          <div className="toast ok" role="note">
+            Recommended: use the Chrome agent while logged into Jira — load unpacked
+            folder <code>ba-jira-assistant/chrome-extension</code>. See{" "}
+            <code>docs/CHROME_AGENT.md</code>. This website stays for bulk / OAuth
+            experiments.
+          </div>
           {lastResult ? (
             <div
               className={`toast ${/fail|wrong|could not|error/i.test(lastResult) ? "error" : "ok"}`}

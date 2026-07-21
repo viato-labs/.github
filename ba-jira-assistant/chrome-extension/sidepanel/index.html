@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket Flow Agent</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="mark">T</span>
+        <div>
+          <strong>Ticket Flow</strong>
+          <small>Chrome agent · uses your login</small>
+        </div>
+      </div>
+      <button id="btn-create" class="create" type="button">Create</button>
+    </header>
+
+    <div class="layout">
+      <aside class="accounts" aria-label="Company accounts">
+        <div class="accounts-head">
+          <h2>Accounts</h2>
+          <button id="btn-add" type="button">+ Add</button>
+        </div>
+        <div id="account-list" class="account-list"></div>
+        <form id="add-form" class="add-form hidden">
+          <input id="add-name" placeholder="Company name" required />
+          <input id="add-project" placeholder="Default project key" />
+          <button type="submit">Save account</button>
+        </form>
+        <p id="session-line" class="session">Open a Jira tab while logged in.</p>
+      </aside>
+
+      <main class="main">
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <form id="composer" class="composer">
+          <textarea
+            id="input"
+            rows="3"
+            placeholder="Paste a brief, or try: search calendar · move BAU-12 to In Analysis confirm · create confirm"
+          ></textarea>
+          <div class="composer-actions">
+            <button id="btn-tools" type="button" class="ghost">Tools</button>
+            <button id="btn-session" type="button" class="ghost">Check login</button>
+            <button type="submit" class="primary">Send</button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
