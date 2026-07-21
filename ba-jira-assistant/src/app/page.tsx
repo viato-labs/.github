@@ -298,16 +298,27 @@ export default function Home() {
   const audienceHelp =
     AUDIENCE_OPTIONS.find((o) => o.id === audience)?.help || "";
 
+  const hasActivity = Boolean(
+    research && (research.jiraHits.length > 0 || research.confluenceHits.length > 0),
+  );
+
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <strong>Ticket Flow</strong>
-          <span>Write tickets like you — with real context</span>
+          <div className="brand-row">
+            <span className="brand-mark" aria-hidden>
+              T
+            </span>
+            <div>
+              <strong>Ticket Flow</strong>
+              <span>Tickets in your voice</span>
+            </div>
+          </div>
         </div>
 
         <div>
-          <p className="side-label">Company accounts</p>
+          <p className="side-label">Accounts</p>
           <div className="account-list">
             {companies.map((company) => (
               <button
@@ -338,9 +349,7 @@ export default function Home() {
         </div>
 
         <div className="add-box">
-          <p className="side-label" style={{ margin: 0 }}>
-            Add account
-          </p>
+          <p className="side-label">Add account</p>
           <input
             placeholder="Company name"
             value={newName}
@@ -378,19 +387,19 @@ export default function Home() {
             I’ll write the tickets like you would.
           </h1>
           <p>
-            I search existing Jira + Confluence (and use your Figma/docs links) so
-            new tickets match the wording, format, and context of what’s already
-            there — then create them as you.
+            Research related Jira + Confluence, use your Figma/docs links, then
+            draft clear human tickets — and create them as you.
           </p>
         </section>
 
         <div className="session-row">
           <div className="who">
+            <span className={`dot ${signedIn ? "ok" : ""}`} />
             {signedIn
               ? `Signed in as ${authStatus?.connection?.oauthAccountName || "you"}`
-              : "Not signed in yet — needed for live research + create"}
+              : "Sign in for live research + create"}
           </div>
-          <div className="actions" style={{ margin: 0 }}>
+          <div className="actions">
             {!signedIn ? (
               <button
                 type="button"
@@ -402,139 +411,178 @@ export default function Home() {
               </button>
             ) : null}
             {jiraUrl ? (
-              <a className="btn ghost" href={jiraUrl} target="_blank" rel="noreferrer">
+              <a
+                className="btn secondary"
+                href={jiraUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open Jira
               </a>
             ) : null}
           </div>
         </div>
 
-        <section className="card">
-          <div className="grid-2">
-            <label className="field">
-              <span>Jira URL for {activeCompany?.name || "this account"}</span>
-              <input
-                value={jiraUrlDraft}
-                onChange={(e) => setJiraUrlDraft(e.target.value)}
-                placeholder="https://christies.atlassian.net"
-              />
-            </label>
-            <label className="field">
-              <span>Who are the tickets for?</span>
-              <select
-                value={audience}
-                onChange={(e) => setAudience(e.target.value as TicketAudience)}
-              >
-                {AUDIENCE_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="hint">{audienceHelp}</p>
-            </label>
-          </div>
-          <div className="actions">
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={busy || !jiraUrlDraft.trim()}
-              onClick={() => void saveJiraUrl()}
-            >
-              Save Jira URL
-            </button>
-          </div>
-        </section>
+        <div className={`main-grid ${hasActivity ? "has-activity" : ""}`}>
+          <div>
+            <section className="card">
+              <h2 className="card-title">Setup</h2>
+              <div className="grid-2">
+                <label className="field">
+                  <span>Jira URL · {activeCompany?.name || "account"}</span>
+                  <input
+                    value={jiraUrlDraft}
+                    onChange={(e) => setJiraUrlDraft(e.target.value)}
+                    placeholder="https://christies.atlassian.net"
+                  />
+                </label>
+                <label className="field">
+                  <span>Tickets are for</span>
+                  <select
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value as TicketAudience)}
+                  >
+                    {AUDIENCE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="hint">{audienceHelp}</p>
+                </label>
+              </div>
+              <div className="actions end">
+                <button
+                  type="button"
+                  className="btn secondary"
+                  disabled={busy || !jiraUrlDraft.trim()}
+                  onClick={() => void saveJiraUrl()}
+                >
+                  Save Jira URL
+                </button>
+              </div>
+            </section>
 
-        <section className="card">
-          <label className="field">
-            <span>Guidance</span>
-            <textarea
-              value={guidance}
-              onChange={(e) => setGuidance(e.target.value)}
-              placeholder="Paste the brief, meeting notes, or “take this document and turn it into tickets”. Speak naturally — I’ll write in the same voice."
-            />
-          </label>
-          <label className="field">
-            <span>Links (Figma, Confluence, docs — one per line)</span>
-            <textarea
-              value={links}
-              onChange={(e) => setLinks(e.target.value)}
-              rows={3}
-              placeholder={"https://www.figma.com/file/...\nhttps://…atlassian.net/wiki/..."}
-              style={{ minHeight: "5.5rem" }}
-            />
-          </label>
-          <label className="field">
-            <span>Files / screenshots</span>
-            <input
-              type="file"
-              multiple
-              accept=".txt,.md,.csv,.pdf,image/*"
-              onChange={(e) => void onFiles(e.target.files)}
-            />
-            {files.length ? (
-              <p className="hint">{files.length} file(s) attached to this guidance</p>
-            ) : (
+            <section className="card" style={{ marginTop: "1.15rem" }}>
+              <h2 className="card-title">Guidance</h2>
+              <label className="field">
+                <span>Brief / document</span>
+                <textarea
+                  value={guidance}
+                  onChange={(e) => setGuidance(e.target.value)}
+                  placeholder="Paste notes or “turn this into tickets”. Speak naturally — I’ll match your voice."
+                />
+              </label>
+              <label className="field">
+                <span>Links · Figma, Confluence, docs</span>
+                <textarea
+                  value={links}
+                  onChange={(e) => setLinks(e.target.value)}
+                  rows={3}
+                  placeholder={"https://www.figma.com/file/...\nhttps://…atlassian.net/wiki/..."}
+                  style={{ minHeight: "5.5rem" }}
+                />
+              </label>
+              <label className="field">
+                <span>Files / screenshots</span>
+                <input
+                  type="file"
+                  multiple
+                  accept=".txt,.md,.csv,.pdf,image/*"
+                  onChange={(e) => void onFiles(e.target.files)}
+                />
+                <p className="hint">
+                  {files.length
+                    ? `${files.length} file(s) attached`
+                    : "Optional — helps match existing tools and wording."}
+                </p>
+              </label>
+              <div className="actions end">
+                <button
+                  type="button"
+                  className="btn secondary"
+                  disabled={busy || !previews.length || !signedIn}
+                  onClick={() => void createAll()}
+                >
+                  Create in Jira
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy || !guidance.trim()}
+                  onClick={() => void researchAndDraft()}
+                >
+                  {busy ? "Working…" : "Research & draft"}
+                </button>
+              </div>
               <p className="hint">
-                Screenshots, exports, and notes help me match existing tools and
-                wording.
+                Chrome agent: load unpacked{" "}
+                <code>ba-jira-assistant/chrome-extension</code> ·{" "}
+                <code>docs/design.md</code>
               </p>
-            )}
-          </label>
-          <div className="actions">
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy || !guidance.trim()}
-              onClick={() => void researchAndDraft()}
-            >
-              {busy ? "Working…" : "Research & draft tickets"}
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={busy || !previews.length || !signedIn}
-              onClick={() => void createAll()}
-            >
-              Create in Jira as me
-            </button>
-          </div>
-          <p className="hint">
-            Prefer living in Chrome? Load unpacked{" "}
-            <code>ba-jira-assistant/chrome-extension</code> — same idea, uses the
-            tab you’re already logged into. See <code>docs/CHROME_AGENT.md</code>.
-          </p>
-        </section>
+            </section>
 
-        {previews.length > 0 && (
-          <section className="card">
-            <div className="session-row" style={{ marginBottom: "0.25rem" }}>
-              <h2 style={{ margin: 0, fontSize: "1.2rem" }}>
-                Draft tickets · {previews.length}
-              </h2>
-              {research ? (
-                <span className="pill">
-                  Context {research.jiraHits.length} Jira ·{" "}
-                  {research.confluenceHits.length} Confluence
-                </span>
-              ) : null}
-            </div>
-            {previews.map((preview) => (
-              <article key={`${preview.summary}-${preview.intent}`} className="ticket">
-                <div className="session-row" style={{ margin: 0 }}>
-                  <h3>{preview.summary}</h3>
-                  <span className="pill">{preview.intent}</span>
+            {previews.length > 0 && (
+              <section className="card" style={{ marginTop: "1.15rem" }}>
+                <div className="session-row" style={{ margin: "0 0 0.35rem" }}>
+                  <h2 className="card-title" style={{ margin: 0 }}>
+                    Draft tickets · {previews.length}
+                  </h2>
+                  {research ? (
+                    <span className="pill">
+                      {research.jiraHits.length} Jira ·{" "}
+                      {research.confluenceHits.length} Confluence
+                    </span>
+                  ) : null}
                 </div>
-                <div className="meta">
-                  {preview.projectKey} · {Math.round(preview.confidence * 100)}%
-                  ready
-                </div>
-                <pre>{preview.markdown}</pre>
-              </article>
-            ))}
-          </section>
-        )}
+                {previews.map((preview) => (
+                  <article
+                    key={`${preview.summary}-${preview.intent}`}
+                    className="ticket"
+                  >
+                    <div className="session-row" style={{ margin: 0 }}>
+                      <h3>{preview.summary}</h3>
+                      <span className="pill">{preview.intent}</span>
+                    </div>
+                    <div className="meta">
+                      {preview.projectKey} ·{" "}
+                      {Math.round(preview.confidence * 100)}% ready
+                    </div>
+                    <pre>{preview.markdown}</pre>
+                  </article>
+                ))}
+              </section>
+            )}
+          </div>
+
+          {hasActivity && research ? (
+            <aside className="card activity">
+              <h2 className="card-title">Context found</h2>
+              <ul className="activity-list">
+                {research.jiraHits.slice(0, 6).map((hit) => (
+                  <li key={hit.id}>
+                    <span className="mark" />
+                    <span>
+                      <strong style={{ color: "var(--ink)" }}>{hit.id}</strong>
+                      <br />
+                      {hit.title}
+                    </span>
+                  </li>
+                ))}
+                {research.confluenceHits.slice(0, 5).map((hit) => (
+                  <li key={`c-${hit.id}`}>
+                    <span className="mark mint" />
+                    <span>
+                      <strong style={{ color: "var(--ink)" }}>Confluence</strong>
+                      <br />
+                      {hit.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          ) : null}
+        </div>
       </main>
     </div>
   );

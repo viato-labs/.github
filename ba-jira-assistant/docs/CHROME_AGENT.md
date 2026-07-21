@@ -26,3 +26,8 @@ The job is not “pick a task type from a menu”.
 It’s: **use my login + this guidance + existing product context → write tickets like I would**.
 
 Figma links and screenshots are treated as design/context references in the draft. Live Figma API parsing can come later; the link and your notes still drive clear Dev/QA tickets today.
+
+## Design system
+
+Visual tokens and components are documented in [`design.md`](./design.md).  
+Web app and Chrome side panel share the same dark glass language.
