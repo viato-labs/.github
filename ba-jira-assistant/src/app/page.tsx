@@ -600,7 +600,7 @@ export default function Home() {
         </div>
 
         <div className={`main-grid ${hasActivity ? "has-activity" : ""}`}>
-          <div>
+          <div className="stack">
             <section className="card">
               <div className="card-head">
                 <h2 className="card-title">
@@ -659,7 +659,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="actions end" style={{ marginTop: "1.15rem" }}>
+              <div className="actions end">
                 <button
                   type="button"
                   className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
@@ -699,7 +699,7 @@ export default function Home() {
             </section>
 
             {previews.length > 0 ? (
-              <section className="card" style={{ marginTop: "1.15rem" }}>
+              <section className="card">
                 <div className="card-head">
                   <h2 className="card-title">
                     <Icon name="stacks" />
@@ -740,7 +740,7 @@ export default function Home() {
                 ))}
               </section>
             ) : (
-              <section className="card waiting-card" style={{ marginTop: "1.15rem" }}>
+              <section className="card waiting-card">
                 <div className="waiting-visual" aria-hidden />
                 <div>
                   <h2 className="card-title">

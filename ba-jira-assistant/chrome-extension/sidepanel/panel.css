@@ -1,12 +1,13 @@
-/* Parity with docs/design.md — compact Chrome portal */
+/* Parity with docs/design.md — color separation, airy Chrome portal */
 :root {
-  --bg-0: #07080c;
-  --bg-1: #0c0e15;
-  --bg-2: #141824;
-  --surface: rgba(255, 255, 255, 0.045);
-  --surface-strong: rgba(255, 255, 255, 0.08);
-  --stroke: rgba(255, 255, 255, 0.09);
-  --stroke-strong: rgba(255, 255, 255, 0.16);
+  --bg-0: #0a0c12;
+  --bg-1: #10131c;
+  --bg-2: #181c28;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.075);
+  --surface-cool: rgba(91, 140, 255, 0.1);
+  --surface-warm: rgba(232, 197, 138, 0.1);
+  --surface-mint: rgba(109, 255, 176, 0.1);
   --ink: #f5f6f8;
   --ink-soft: #a8b0bb;
   --ink-faint: #6d7684;
@@ -15,8 +16,8 @@
   --accent-soft: rgba(91, 140, 255, 0.18);
   --mint: #6dffb0;
   --gold: #e8c58a;
-  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.4);
-  --glow-accent: 0 0 0 1px rgba(91, 140, 255, 0.32), 0 10px 28px rgba(91, 140, 255, 0.2);
+  --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.28);
+  --glow-accent: 0 10px 28px rgba(91, 140, 255, 0.22);
   --r-sm: 12px;
   --r-lg: 18px;
   --r-pill: 999px;
@@ -32,7 +33,7 @@ html, body {
   height: 100%;
   color: var(--ink);
   background:
-    radial-gradient(600px 280px at 10% -10%, rgba(91, 140, 255, 0.18), transparent 55%),
+    radial-gradient(600px 280px at 10% -10%, rgba(91, 140, 255, 0.16), transparent 55%),
     var(--bg-0);
 }
 
@@ -56,10 +57,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.8rem 0.9rem;
-  background: rgba(12, 14, 21, 0.92);
-  border-bottom: 1px solid var(--stroke);
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--bg-1);
   backdrop-filter: blur(14px);
 }
 
@@ -67,6 +67,7 @@ body {
   display: flex;
   gap: 0.55rem;
   align-items: center;
+  min-width: 0;
 }
 
 .brand-mini .mark {
@@ -79,6 +80,7 @@ body {
   color: #fff;
   font-size: 1rem;
   box-shadow: var(--glow-accent);
+  flex: 0 0 auto;
 }
 
 .brand-mini strong { display: block; font-size: 0.95rem; }
@@ -93,10 +95,11 @@ body {
   color: #fff;
   font-weight: 700;
   border-radius: var(--r-pill);
-  padding: 0.45rem 0.8rem;
+  padding: 0.5rem 0.85rem;
   cursor: pointer;
   box-shadow: var(--glow-accent);
   transition: transform 160ms var(--ease-spring);
+  white-space: nowrap;
 }
 
 .create:hover { transform: translateY(-1px) scale(1.02); }
@@ -104,19 +107,18 @@ body {
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 138px 1fr;
+  grid-template-columns: 140px 1fr;
   min-height: 0;
 }
 
 .rail {
-  border-right: 1px solid var(--stroke);
   background: var(--bg-1);
-  padding: 0.75rem 0.55rem;
+  padding: 0.85rem 0.65rem;
   overflow: auto;
 }
 
 .label {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.5rem;
   padding: 0 0.25rem;
   font-size: 0.65rem;
   font-weight: 700;
@@ -125,14 +127,14 @@ body {
   color: var(--ink-faint);
 }
 
-.account-list { display: grid; gap: 0.28rem; }
+.account-list { display: grid; gap: 0.35rem; }
 
 .account {
   width: 100%;
-  border: 1px solid transparent;
+  border: 0;
   background: transparent;
   border-radius: 12px;
-  padding: 0.42rem;
+  padding: 0.5rem;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 0.4rem;
@@ -149,8 +151,7 @@ body {
 }
 
 .account[data-active="true"] {
-  background: var(--surface-strong);
-  border-color: rgba(91, 140, 255, 0.35);
+  background: var(--surface-cool);
   box-shadow: var(--glow-accent);
 }
 
@@ -165,9 +166,7 @@ body {
   place-items: center;
 }
 
-.account-copy {
-  min-width: 0;
-}
+.account-copy { min-width: 0; }
 
 .account-copy strong {
   display: block;
@@ -190,23 +189,26 @@ body {
 }
 
 .link {
-  margin-top: 0.5rem;
+  margin-top: 0.55rem;
   border: 0;
   background: transparent;
   color: var(--accent);
   font-weight: 650;
   font-size: 0.78rem;
   cursor: pointer;
-  padding: 0.25rem 0.25rem;
+  padding: 0.25rem;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
 .add-form {
-  margin-top: 0.4rem;
+  margin-top: 0.5rem;
   display: grid;
-  gap: 0.3rem;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  border-radius: 12px;
+  background: var(--surface-warm);
 }
 
 .add-form.hidden { display: none; }
@@ -216,13 +218,13 @@ body {
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid var(--stroke);
+  border: 0;
   border-radius: var(--r-sm);
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.7rem;
   font: inherit;
   color: var(--ink);
   background: var(--bg-2);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition: background 140ms ease, box-shadow 140ms ease;
 }
 
 .add-form input:focus,
@@ -230,7 +232,7 @@ body {
 .field select:focus,
 .field textarea:focus {
   outline: none;
-  border-color: rgba(91, 140, 255, 0.55);
+  background: #1f2536;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -239,30 +241,30 @@ body {
   background: var(--accent);
   color: #fff;
   border-radius: 10px;
-  padding: 0.42rem;
+  padding: 0.5rem;
   font-weight: 650;
   cursor: pointer;
 }
 
 .session {
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
   font-size: 0.7rem;
   color: var(--ink-faint);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .main {
-  padding: 0.85rem;
+  padding: 1rem;
   overflow: auto;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.9rem;
   align-content: start;
 }
 
 .hero-mini {
-  padding: 0.85rem 0.95rem;
+  padding: 1rem 1.05rem;
   border-radius: var(--r-lg);
-  border: 1px solid var(--stroke);
+  border: 0;
   background:
     linear-gradient(120deg, rgba(7, 8, 12, 0.75), rgba(7, 8, 12, 0.45)),
     url("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=900&q=70")
@@ -271,10 +273,13 @@ body {
 }
 
 .hero-mini .kicker {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.4rem;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: var(--r-pill);
+  background: rgba(232, 197, 138, 0.16);
   color: var(--gold);
   font-size: 0.68rem;
   font-weight: 700;
@@ -289,13 +294,13 @@ body {
 }
 
 .hero-mini .hero-sub {
-  margin: 0.4rem 0 0;
+  margin: 0.45rem 0 0;
   color: rgba(245, 246, 248, 0.78);
   font-size: 0.82rem;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-.field { display: grid; gap: 0.3rem; }
+.field { display: grid; gap: 0.35rem; }
 
 .field > span {
   font-size: 0.66rem;
@@ -313,13 +318,13 @@ body {
 .row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.45rem;
   justify-content: flex-end;
 }
 
@@ -327,14 +332,14 @@ button.primary,
 button.ghost {
   border: 0;
   border-radius: var(--r-pill);
-  padding: 0.5rem 0.8rem;
+  padding: 0.55rem 0.85rem;
   font-weight: 650;
   cursor: pointer;
   min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  transition: transform 150ms var(--ease-spring);
+  transition: transform 150ms var(--ease-spring), background 150ms ease;
 }
 
 button.primary {
@@ -349,30 +354,37 @@ button.primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 button.ghost {
   background: var(--surface-strong);
   color: var(--ink);
-  border: 1px solid var(--stroke);
 }
 
-.out { display: grid; gap: 0.5rem; }
+button.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.out { display: grid; gap: 0.65rem; }
 
 .bubble,
 .ticket {
   background: var(--surface);
-  border: 1px solid var(--stroke);
+  border: 0;
   border-radius: var(--r-lg);
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 0.95rem;
   backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-soft);
   animation: rise 240ms var(--ease-out) both;
 }
 
 .bubble {
   white-space: pre-wrap;
   font-size: 0.84rem;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--ink-soft);
+  background: var(--surface-mint);
 }
 
-.ticket strong { display: block; margin-bottom: 0.3rem; color: var(--ink); }
+.ticket {
+  background: var(--surface-cool);
+}
+
+.ticket strong { display: block; margin-bottom: 0.35rem; color: var(--ink); }
 .ticket pre {
   margin: 0;
   white-space: pre-wrap;
@@ -386,6 +398,36 @@ button.ghost {
 @keyframes rise {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 420px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    padding: 0.75rem;
+  }
+
+  .account-list {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+  }
+
+  .account {
+    min-width: 150px;
+    background: var(--surface);
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  button.primary,
+  button.ghost {
+    flex: 1 1 auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,10 +24,11 @@ A dark “magazine portal” into each company’s world — simple to use, rich
 
 1. **Portal, not dashboard** — one composition; brand and company world first.
 2. **Guidance in → tickets out** — no fake task menus.
-3. **Depth over chrome** — glass, light edges, soft atmosphere.
-4. **Motion with meaning** — every animation signals state or hierarchy.
-5. **Human density** — generous space; metadata stays quiet.
+3. **Color over outlines** — separate regions with tonal fills (cool / warm / mint), not borders.
+4. **Airy ease** — generous whitespace; one job per band; quiet metadata.
+5. **Motion with meaning** — every animation signals state or hierarchy.
 6. **Icons as verbs** — Material Symbols mark actions, not decoration spam.
+7. **Responsive by default** — stack gracefully; horizontal account scroller on narrow viewports.
 
 ---
 
@@ -37,18 +38,23 @@ A dark “magazine portal” into each company’s world — simple to use, rich
 
 | Token | Value | Use |
 |---|---|---|
-| `--bg-0` | `#07080C` | Canvas |
-| `--bg-1` | `#0C0E15` | Sidebar |
-| `--bg-2` | `#141824` | Input wells |
-| `--surface` | `rgba(255,255,255,0.045)` | Glass |
-| `--surface-strong` | `rgba(255,255,255,0.08)` | Elevated glass |
-| `--stroke` / `--stroke-strong` | `0.09` / `0.16` white | Edges |
+| `--bg-0` | `#0A0C12` | Canvas |
+| `--bg-1` | `#10131C` | Sidebar / rail |
+| `--bg-2` | `#181C28` | Input wells |
+| `--surface` | soft white alpha | Default panel |
+| `--surface-cool` | blue alpha | Active / guidance / context |
+| `--surface-warm` | gold alpha | Add account / waiting |
+| `--surface-mint` | mint alpha | Success toast / tips |
 | `--ink` / `--ink-soft` / `--ink-faint` | `#F5F6F8` / `#A8B0BB` / `#6D7684` | Text |
 | `--accent` / `--accent-deep` | `#5B8CFF` / `#3D6AE6` | Primary |
-| `--accent-soft` | `rgba(91,140,255,0.18)` | Selection / focus |
+| `--accent-soft` | `rgba(91,140,255,0.18)` | Focus ring / selection |
 | `--mint` | `#6DFFB0` | Success |
 | `--gold` | `#E8C58A` | Portal kicker |
 | `--danger` | `#FF6B7A` | Errors |
+
+**No hairline borders for structure.** Panels, tickets, chips, and inputs are filled tonal shapes. Focus uses a soft accent glow, not a hard outline.
+
+Whitespace scale: `--space-1` … `--space-6` (0.5 → 3.5rem). Main column uses flex gap; cards stack with air.
 
 Atmosphere: soft blue + warm gold radials + very light photographic wash (`mix-blend-mode: soft-light`).
 
@@ -168,8 +174,13 @@ Respect `prefers-reduced-motion: reduce` (kill animation + ken-burns).
 
 ## 7. Do / Don’t
 
-**Do** keep one accent family; use icons as verbs; match Chrome + web tokens.  
-**Don’t** neon every control; duplicate task nav; nest cards endlessly; use Inter/Roboto for brand.
+**Do** keep one accent family; separate with color fields; leave air; match Chrome + web tokens.  
+**Don’t** outline every box; neon every control; crowd the first viewport; use Inter/Roboto for brand.
+
+### Responsive notes
+- `≤1180px` — activity + mood stack under main
+- `≤920px` — single column; account chips scroll horizontally
+- `≤560px` — full-width CTAs, tighter type, still airy padding
 
 ---
 
