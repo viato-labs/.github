@@ -92,18 +92,9 @@ body::before {
     var(--bg-0);
 }
 
+/* Soft color wash only — no full-page photo under functional UI */
 body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.14;
-  background-image: var(--img-portal);
-  background-size: cover;
-  background-position: center;
-  mix-blend-mode: soft-light;
-  animation: atmosphere-drift 48s ease-in-out infinite alternate;
+  content: none;
 }
 
 button,
@@ -344,18 +335,20 @@ code {
 /* ─── Main / Magazine portal ─── */
 
 .main {
-  padding: var(--space-5) clamp(1.25rem, 3vw, 2.75rem) var(--space-6);
-  width: min(1120px, 100%);
+  padding: var(--space-4) clamp(1.25rem, 2.5vw, 2.5rem) var(--space-6);
+  width: 100%;
+  max-width: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .portal-hero {
   position: relative;
   overflow: hidden;
   border-radius: var(--r-xl);
-  min-height: clamp(220px, 32vw, 300px);
+  min-height: clamp(160px, 18vw, 220px);
   margin: 0;
   box-shadow: var(--shadow-soft);
   animation: rise 640ms var(--ease-out) both;
@@ -375,8 +368,8 @@ code {
 .portal-hero-content {
   position: relative;
   z-index: 1;
-  padding: 2.1rem 2.2rem 1.9rem;
-  max-width: 38rem;
+  padding: clamp(1.35rem, 2.5vw, 2rem) clamp(1.35rem, 3vw, 2.4rem);
+  max-width: min(52rem, 100%);
 }
 
 .portal-kicker {
@@ -404,10 +397,10 @@ code {
 .portal-hero h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-size: clamp(1.9rem, 3.6vw, 2.75rem);
   font-weight: 400;
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1.1;
   animation: rise 720ms var(--ease-out) 120ms both;
 }
 
@@ -491,20 +484,55 @@ code {
   animation: pulse-dot 2.4s ease-in-out infinite;
 }
 
-.main-grid {
+.workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-}
-
-.main-grid.has-activity {
-  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.78fr);
+  gap: var(--space-3);
   align-items: start;
 }
 
-.stack {
+.workbench.has-context {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+}
+
+.grid-3 {
   display: grid;
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.actions-field .btn {
+  width: 100%;
+}
+
+.card-sub {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: var(--space-3);
+}
+
+.ticket-grid .ticket {
+  margin-top: 0;
+  height: 100%;
+}
+
+.empty-hint {
+  margin: 0;
+  padding: 0.35rem 0;
+  color: var(--ink-faint);
+  font-size: 0.95rem;
+}
+
+.setup-card,
+.drafts-card {
+  width: 100%;
 }
 
 /* ─── Soft tonal panels (no outline chrome) ─── */
@@ -841,17 +869,11 @@ select {
   position: sticky;
   top: 1.25rem;
   animation: rise 640ms var(--ease-out) 120ms both;
+  background: rgba(109, 255, 176, 0.05);
 }
 
-.activity-visual {
-  height: 120px;
-  border-radius: var(--r-md);
-  margin-bottom: var(--space-3);
-  background-image: linear-gradient(180deg, rgba(7, 8, 12, 0.15), rgba(7, 8, 12, 0.72)),
-    var(--img-craft);
-  background-size: cover;
-  background-position: center;
-  overflow: hidden;
+.activity .card-title {
+  margin-bottom: var(--space-2);
 }
 
 .activity-list {
@@ -899,62 +921,11 @@ select {
   font-size: 1rem;
 }
 
-.spread {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: var(--space-4);
-  margin: 0;
-}
-
-.mood-tile {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--r-lg);
-  min-height: 168px;
-  border: 0;
-  animation: rise 700ms var(--ease-out) 200ms both;
-}
-
-.mood-tile-media {
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(160deg, rgba(7, 8, 12, 0.2), rgba(7, 8, 12, 0.78)),
-    var(--img-craft);
-  background-size: cover;
-  background-position: center;
-  transition: transform 700ms var(--ease-out);
-}
-
-.mood-tile:hover .mood-tile-media {
-  transform: scale(1.06);
-}
-
-.mood-tile-copy {
-  position: relative;
-  z-index: 1;
-  padding: var(--space-4);
-}
-
-.mood-tile-copy strong {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 1.45rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-}
-
-.mood-tile-copy span {
-  display: block;
-  margin-top: 0.35rem;
-  color: rgba(245, 246, 248, 0.78);
-  font-size: 0.9rem;
-}
-
 .audience-icons {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin: 0 0 1rem;
+  margin: 0;
 }
 
 .audience-chip {
@@ -1015,38 +986,6 @@ select {
   font-size: 1.15rem;
   color: var(--gold);
   letter-spacing: -0.02em;
-}
-
-.waiting-card {
-  display: grid;
-  grid-template-columns: minmax(120px, 160px) 1fr;
-  gap: var(--space-3);
-  align-items: center;
-  background: var(--surface-warm);
-}
-
-.waiting-visual {
-  height: 120px;
-  border-radius: var(--r-md);
-  border: 0;
-  background-image:
-    linear-gradient(160deg, rgba(7, 8, 12, 0.2), rgba(7, 8, 12, 0.75)),
-    url("https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=900&q=80");
-  background-size: cover;
-  background-position: center;
-  animation: ken-burns 22s ease-in-out infinite alternate;
-}
-
-.activity.tip-rail {
-  background: var(--surface-cool);
-}
-
-.activity:not(.tip-rail) {
-  background: rgba(109, 255, 176, 0.05);
-}
-
-.tip-rail .card-title {
-  margin-bottom: 0.85rem;
 }
 
 .hint .material-symbols-outlined {
@@ -1126,8 +1065,8 @@ select {
 }
 
 @media (max-width: 1180px) {
-  .main-grid.has-activity,
-  .spread {
+  .workbench.has-context,
+  .grid-3 {
     grid-template-columns: 1fr;
   }
 
@@ -1180,17 +1119,12 @@ select {
     gap: var(--space-3);
   }
 
-  .grid-2,
-  .waiting-card {
+  .grid-2 {
     grid-template-columns: 1fr;
   }
 
   .portal-hero-content {
-    padding: 1.5rem 1.35rem 1.4rem;
-  }
-
-  .portal-hero h1 {
-    font-size: clamp(2rem, 8vw, 2.7rem);
+    padding: 1.25rem 1.2rem;
   }
 
   .actions {
@@ -1225,10 +1159,6 @@ select {
     border-radius: 22px;
   }
 
-  .portal-chips {
-    gap: 0.35rem;
-  }
-
   .chip,
   .audience-chip {
     font-size: 0.75rem;
@@ -1240,11 +1170,6 @@ select {
 
   .ticket h3 {
     font-size: 0.98rem;
-  }
-
-  .waiting-visual,
-  .activity-visual {
-    height: 96px;
   }
 }
 

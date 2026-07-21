@@ -262,13 +262,10 @@ body {
 }
 
 .hero-mini {
-  padding: 1rem 1.05rem;
+  padding: 0.95rem 1rem;
   border-radius: var(--r-lg);
   border: 0;
-  background:
-    linear-gradient(120deg, rgba(7, 8, 12, 0.75), rgba(7, 8, 12, 0.45)),
-    url("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=900&q=70")
-      center/cover;
+  background: linear-gradient(135deg, var(--surface-cool), rgba(232, 197, 138, 0.1));
   animation: rise 420ms var(--ease-out) both;
 }
 

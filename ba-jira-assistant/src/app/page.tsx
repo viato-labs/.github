@@ -450,32 +450,17 @@ export default function Home() {
           <div className="portal-hero-media" aria-hidden />
           <div className="portal-hero-content">
             <p className="portal-kicker">
-              <Icon name="menu_book" />
-              Magazine desk → Jira board
+              <Icon name="auto_awesome" />
+              Ticket Flow
             </p>
             <h1>
-              Ticket Flow
-              <br />
-              <em>Drop guidance. Leave with tickets that sound like you.</em>
+              Drop guidance.
+              <em> Leave with tickets that sound like you.</em>
             </h1>
             <p>
-              Pick a company world, point at their Jira, and let research + memory
-              shape authentic stories — then create as your logged-in self.
+              Select a company, add your brief, research related work, then create
+              as your logged-in self.
             </p>
-            <div className="portal-chips">
-              <span className="chip">
-                <Icon name="sensors" />
-                Session-aware
-              </span>
-              <span className="chip">
-                <Icon name="psychology" />
-                Historical voice
-              </span>
-              <span className="chip">
-                <Icon name="shield" />
-                Confirm before create
-              </span>
-            </div>
           </div>
         </section>
 
@@ -522,70 +507,56 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="spread">
-          <article className="mood-tile">
-            <div className="mood-tile-media" aria-hidden />
-            <div className="mood-tile-copy">
-              <strong>Their world</strong>
+        <section className="card setup-card">
+          <div className="card-head">
+            <h2 className="card-title">
+              <Icon name="tune" />
+              1 · Setup
+            </h2>
+            <p className="card-sub">
+              {activeCompany
+                ? `Working in ${activeCompany.name}`
+                : "Choose a company in the sidebar"}
+            </p>
+          </div>
+          <div className="grid-3">
+            <label className="field">
               <span>
-                {activeCompany
-                  ? `Writing inside ${activeCompany.name} — isolated memory, DoR, and history.`
-                  : "Choose an account to enter a company portal."}
+                <Icon name="link" />
+                Jira home
               </span>
+              <input
+                value={jiraUrlDraft}
+                onChange={(e) => setJiraUrlDraft(e.target.value)}
+                placeholder="https://christiestech.atlassian.net"
+              />
+            </label>
+            <div className="field">
+              <span>
+                <Icon name="record_voice_over" />
+                Tickets are for
+              </span>
+              <div className="audience-icons">
+                {AUDIENCE_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`audience-chip ${audience === option.id ? "active" : ""}`}
+                    onClick={() => setAudience(option.id)}
+                    title={option.help}
+                  >
+                    <Icon name={option.icon} />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="hint">{audienceHelp}</p>
             </div>
-          </article>
-
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">
-                <Icon name="tune" />
-                Setup
-              </h2>
-            </div>
-            <div className="grid-2">
-              <label className="field">
-                <span>
-                  <Icon name="link" />
-                  Jira home · {activeCompany?.name || "account"}
-                </span>
-                <input
-                  value={jiraUrlDraft}
-                  onChange={(e) => setJiraUrlDraft(e.target.value)}
-                    placeholder="https://christiestech.atlassian.net"
-                />
-              </label>
-              <label className="field">
-                <span>
-                  <Icon name="record_voice_over" />
-                  Tickets are for
-                </span>
-                <select
-                  value={audience}
-                  onChange={(e) => setAudience(e.target.value as TicketAudience)}
-                >
-                  {AUDIENCE_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="hint">{audienceHelp}</p>
-              </label>
-            </div>
-            <div className="audience-icons" aria-hidden>
-              {AUDIENCE_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`audience-chip ${audience === option.id ? "active" : ""}`}
-                  onClick={() => setAudience(option.id)}
-                >
-                  <Icon name={option.icon} />
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="actions end">
+            <div className="field actions-field">
+              <span>
+                <Icon name="save" />
+                Save
+              </span>
               <button
                 type="button"
                 className="btn secondary"
@@ -596,35 +567,31 @@ export default function Home() {
                 Save Jira URL
               </button>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
 
-        <div className={`main-grid ${hasActivity ? "has-activity" : ""}`}>
-          <div className="stack">
-            <section className="card">
-              <div className="card-head">
-                <h2 className="card-title">
-                  <Icon name="edit_note" />
-                  Guidance
-                </h2>
-                <span className="pill">
-                  <Icon name="auto_awesome" />
-                  Your voice
-                </span>
-              </div>
+        <div className={`workbench ${hasActivity ? "has-context" : ""}`}>
+          <section className="card">
+            <div className="card-head">
+              <h2 className="card-title">
+                <Icon name="edit_note" />
+                2 · Guidance
+              </h2>
+            </div>
 
-              <label className="field">
-                <span>
-                  <Icon name="description" />
-                  Brief / document
-                </span>
-                <textarea
-                  value={guidance}
-                  onChange={(e) => setGuidance(e.target.value)}
-                  placeholder="Paste notes or “turn this into tickets”. Speak naturally — I’ll match your voice."
-                />
-              </label>
+            <label className="field">
+              <span>
+                <Icon name="description" />
+                Brief / document
+              </span>
+              <textarea
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                placeholder="Paste notes or “turn this into tickets”. Speak naturally — I’ll match your voice."
+              />
+            </label>
 
+            <div className="grid-2">
               <label className="field">
                 <span>
                   <Icon name="link" />
@@ -640,7 +607,6 @@ export default function Home() {
                   style={{ minHeight: "5.5rem" }}
                 />
               </label>
-
               <div className="drop-zone">
                 <div className="drop-zone-label">
                   <Icon name="upload_file" />
@@ -654,117 +620,54 @@ export default function Home() {
                 />
                 <p className="hint">
                   {files.length
-                    ? `${files.length} file(s) attached to this brief`
-                    : "Optional — helps match existing tools and wording."}
+                    ? `${files.length} file(s) attached`
+                    : "Optional context for wording and tools."}
                 </p>
               </div>
+            </div>
 
-              <div className="actions end">
-                <button
-                  type="button"
-                  className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
-                  disabled={busy || !previews.length || !signedIn}
-                  onClick={() => void createAll()}
-                >
-                  <Icon
-                    name={
-                      busy && stage === "creating" ? "progress_activity" : "publish"
-                    }
-                  />
-                  Create in Jira
-                </button>
-                <button
-                  type="button"
-                  className={`btn primary ${busy && stage === "researching" ? "busy" : ""}`}
-                  disabled={busy || !guidance.trim()}
-                  onClick={() => void researchAndDraft()}
-                >
-                  <Icon
-                    name={
-                      busy && stage === "researching"
-                        ? "progress_activity"
-                        : "travel_explore"
-                    }
-                  />
-                  {busy && stage === "researching"
-                    ? "Researching…"
-                    : "Research & draft"}
-                </button>
-              </div>
-              <p className="hint">
-                <Icon name="extension" /> Chrome agent: load unpacked{" "}
-                <code>ba-jira-assistant/chrome-extension</code> on a logged-in
-                Jira tab for the zero-token path.
-              </p>
-            </section>
-
-            {previews.length > 0 ? (
-              <section className="card">
-                <div className="card-head">
-                  <h2 className="card-title">
-                    <Icon name="stacks" />
-                    Draft tickets · {previews.length}
-                  </h2>
-                  {research ? (
-                    <span className="pill">
-                      <Icon name="insights" />
-                      {research.jiraHits.length} Jira ·{" "}
-                      {research.confluenceHits.length} Confluence
-                    </span>
-                  ) : null}
-                </div>
-                {previews.map((preview, index) => (
-                  <article
-                    key={`${preview.summary}-${preview.intent}`}
-                    className="ticket"
-                    style={{ animationDelay: `${40 + index * 60}ms` }}
-                  >
-                    <div className="session-row" style={{ margin: 0 }}>
-                      <h3>
-                        <span className="ticket-num">
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-                        {preview.summary}
-                      </h3>
-                      <span className="pill">{preview.intent}</span>
-                    </div>
-                    <div className="meta">
-                      <Icon name="flag" />
-                      {preview.projectKey}
-                      <span aria-hidden>·</span>
-                      <Icon name="verified" />
-                      {Math.round(preview.confidence * 100)}% ready
-                    </div>
-                    <pre>{preview.markdown}</pre>
-                  </article>
-                ))}
-              </section>
-            ) : (
-              <section className="card waiting-card">
-                <div className="waiting-visual" aria-hidden />
-                <div>
-                  <h2 className="card-title">
-                    <Icon name="hourglass_empty" />
-                    Your draft stack lands here
-                  </h2>
-                  <p className="hint">
-                    After research, tickets arrive like magazine spreads —
-                    numbered, scannable, ready to publish as you.
-                  </p>
-                </div>
-              </section>
-            )}
-          </div>
+            <div className="actions end">
+              <button
+                type="button"
+                className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
+                disabled={busy || !previews.length || !signedIn}
+                onClick={() => void createAll()}
+              >
+                <Icon
+                  name={
+                    busy && stage === "creating" ? "progress_activity" : "publish"
+                  }
+                />
+                Create in Jira
+              </button>
+              <button
+                type="button"
+                className={`btn primary ${busy && stage === "researching" ? "busy" : ""}`}
+                disabled={busy || !guidance.trim()}
+                onClick={() => void researchAndDraft()}
+              >
+                <Icon
+                  name={
+                    busy && stage === "researching"
+                      ? "progress_activity"
+                      : "travel_explore"
+                  }
+                />
+                {busy && stage === "researching"
+                  ? "Researching…"
+                  : "Research & draft"}
+              </button>
+            </div>
+          </section>
 
           {hasActivity && research ? (
             <aside className="card activity">
-              <div className="activity-visual" aria-hidden />
               <h2 className="card-title">
                 <Icon name="hub" />
                 Context found
               </h2>
               <ul className="activity-list">
-                {research.jiraHits.slice(0, 6).map((hit) => (
+                {research.jiraHits.slice(0, 8).map((hit) => (
                   <li key={hit.id}>
                     <span className="ico">
                       <Icon name="confirmation_number" />
@@ -776,7 +679,7 @@ export default function Home() {
                     </span>
                   </li>
                 ))}
-                {research.confluenceHits.slice(0, 5).map((hit) => (
+                {research.confluenceHits.slice(0, 6).map((hit) => (
                   <li key={`c-${hit.id}`}>
                     <span className="ico mint">
                       <Icon name="menu_book" />
@@ -790,36 +693,59 @@ export default function Home() {
                 ))}
               </ul>
             </aside>
-          ) : (
-            <aside className="card activity tip-rail">
-              <div className="activity-visual" aria-hidden />
-              <h2 className="card-title">
-                <Icon name="lightbulb" />
-                How the portal works
-              </h2>
-              <ul className="activity-list">
-                <li>
-                  <span className="ico">
-                    <Icon name="swap_horiz" />
-                  </span>
-                  <span>Switch company — each world stays isolated.</span>
-                </li>
-                <li>
-                  <span className="ico">
-                    <Icon name="edit_note" />
-                  </span>
-                  <span>Drop a brief, files, Figma, or Confluence links.</span>
-                </li>
-                <li>
-                  <span className="ico mint">
-                    <Icon name="publish" />
-                  </span>
-                  <span>Review the stack, then create as your logged-in self.</span>
-                </li>
-              </ul>
-            </aside>
-          )}
+          ) : null}
         </div>
+
+        <section className="card drafts-card">
+          <div className="card-head">
+            <h2 className="card-title">
+              <Icon name="stacks" />
+              3 · Draft tickets
+              {previews.length ? ` · ${previews.length}` : ""}
+            </h2>
+            {research ? (
+              <span className="pill">
+                <Icon name="insights" />
+                {research.jiraHits.length} Jira · {research.confluenceHits.length}{" "}
+                Confluence
+              </span>
+            ) : null}
+          </div>
+
+          {previews.length > 0 ? (
+            <div className="ticket-grid">
+              {previews.map((preview, index) => (
+                <article
+                  key={`${preview.summary}-${preview.intent}`}
+                  className="ticket"
+                  style={{ animationDelay: `${40 + index * 60}ms` }}
+                >
+                  <div className="session-row" style={{ margin: 0 }}>
+                    <h3>
+                      <span className="ticket-num">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      {preview.summary}
+                    </h3>
+                    <span className="pill">{preview.intent}</span>
+                  </div>
+                  <div className="meta">
+                    <Icon name="flag" />
+                    {preview.projectKey}
+                    <span aria-hidden>·</span>
+                    <Icon name="verified" />
+                    {Math.round(preview.confidence * 100)}% ready
+                  </div>
+                  <pre>{preview.markdown}</pre>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-hint">
+              Drafts appear here after you run <strong>Research & draft</strong>.
+            </p>
+          )}
+        </section>
       </main>
     </div>
   );

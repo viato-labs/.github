@@ -78,13 +78,7 @@ Hero uses italic serif emphasis (`em`) for the human line.
 
 ### 2.4 Imagery
 
-Editorial photos (atelier / craft / abstract light) as:
-
-- Fixed body atmosphere (low opacity)
-- Portal hero media (ken-burns)
-- Mood tile + activity visual
-
-Prefer real photography over abstract AI blobs. Swap per company later if desired.
+Use photography **only** in the portal hero/banner. Functional areas (setup, guidance, drafts, context) stay clear tonal panels with icons — no decorative images.
 
 ### 2.5 Icons (Material Symbols)
 
@@ -104,12 +98,14 @@ Load once in `layout.tsx` via Google Fonts CSS.
 ## 3. Layout
 
 ```
-Sidebar (accounts) │ Portal hero (full-bleed editorial)
+Sidebar (accounts) │ Compact hero banner
                    │ Session strip
-                   │ Mood tile + Setup glass
-                   │ Guidance glass │ Context rail
-                   │ Draft ticket spreads
+                   │ 1 Setup (full width)
+                   │ 2 Guidance (+ context when research returns)
+                   │ 3 Draft tickets (full-width grid)
 ```
+
+Main column uses the **full remaining width** (no narrow content cap).
 
 **Alignment**
 - Shared `24px` card inset
