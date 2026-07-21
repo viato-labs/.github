@@ -160,6 +160,31 @@ const handlers = {
     };
   },
 
+  async searchConfluence({ query }) {
+    const cql = `siteSearch ~ "${String(query).replace(/"/g, '\\"')}"`;
+    try {
+      const data = await jiraFetch(
+        `/wiki/rest/api/search?${new URLSearchParams({
+          cql,
+          limit: "6",
+        }).toString()}`,
+      );
+      const results = data.results || [];
+      return {
+        pages: results.map((item) => ({
+          title: item.title || item.content?.title,
+          url: item.url
+            ? item.url.startsWith("http")
+              ? item.url
+              : `${originBase()}/wiki${item.url}`
+            : undefined,
+        })),
+      };
+    } catch {
+      return { pages: [] };
+    }
+  },
+
   async transitionIssue({ issueKey, transitionId, targetStatus }) {
     const listed = await handlers.listTransitions({ issueKey });
     let id = transitionId;

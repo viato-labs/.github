@@ -1,63 +1,21 @@
-/** Tool definitions the agent can call (outside Cursor). */
+/** Tools the Chrome agent can run (no Cursor plugin). */
 
 export const TOOLS = [
+  { name: "detect_session", description: "See who you’re logged into Jira as." },
+  { name: "open_jira", description: "Open this company’s Jira URL in a tab." },
+  { name: "switch_account", description: "Switch Christie's / McLaren / other." },
+  { name: "add_account", description: "Add a company with its Jira URL." },
   {
-    name: "detect_session",
-    description: "Detect the active Jira tab, site host, and logged-in user.",
+    name: "draft_from_guidance",
+    description: "Research context and draft human tickets from guidance + links.",
   },
   {
-    name: "list_accounts",
-    description: "List company accounts (Christie's, McLaren, custom).",
+    name: "create_tickets",
+    description: "Create drafted tickets in Jira using your Chrome login (confirm).",
   },
-  {
-    name: "switch_account",
-    description: "Switch the active company account by id or name.",
-    params: ["account"],
-  },
-  {
-    name: "add_account",
-    description: "Add a new company account.",
-    params: ["name", "projectKey?"],
-  },
-  {
-    name: "draft_ticket",
-    description: "Draft a Christie's-style ticket from a brief.",
-    params: ["brief"],
-  },
-  {
-    name: "create_ticket",
-    description: "Create the current draft in Jira using your Chrome login session.",
-    params: ["confirm"],
-  },
-  {
-    name: "search_jira",
-    description: "Search Jira (JQL or text) using your session.",
-    params: ["query"],
-  },
-  {
-    name: "read_issue",
-    description: "Read an issue by key, or the issue open in the active tab.",
-    params: ["issueKey?"],
-  },
-  {
-    name: "list_transitions",
-    description: "List allowed status transitions for an issue.",
-    params: ["issueKey"],
-  },
-  {
-    name: "move_status",
-    description: "Move an issue to a target status (confirm required).",
-    params: ["issueKey", "status", "confirm"],
-  },
-  {
-    name: "copy_paste_pack",
-    description: "Build a copy/paste pack from the current draft.",
-  },
+  { name: "search_context", description: "Search Jira + Confluence for related work." },
 ];
 
 export function toolHelp() {
-  return TOOLS.map(
-    (tool) =>
-      `• ${tool.name}${tool.params?.length ? ` (${tool.params.join(", ")})` : ""} — ${tool.description}`,
-  ).join("\n");
+  return TOOLS.map((t) => `• ${t.name} — ${t.description}`).join("\n");
 }

@@ -1,21 +1,18 @@
 :root {
   --blue: #0b5fff;
   --blue-deep: #0847c7;
-  --ink: #172b4d;
-  --soft: #5e6c84;
-  --faint: #7a869a;
-  --canvas: #f4f5f7;
-  --line: #ebecf0;
+  --ink: #1d1d1f;
+  --soft: #6e6e73;
+  --faint: #86868b;
+  --canvas: #f5f5f7;
+  --line: rgba(0, 0, 0, 0.08);
   --surface: #fff;
   font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
-body {
+html, body {
   margin: 0;
   height: 100%;
   background: var(--canvas);
@@ -30,41 +27,16 @@ body {
 
 .top {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 1rem;
   background: var(--blue);
   color: #fff;
 }
 
-.brand {
-  display: flex;
-  gap: 0.55rem;
-  align-items: center;
-  min-width: 0;
-}
-
-.mark {
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.18);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-}
-
-.brand strong {
-  display: block;
-  font-size: 0.95rem;
-}
-
-.brand small {
-  display: block;
-  opacity: 0.8;
-  font-size: 0.72rem;
-}
+.top strong { display: block; font-size: 1rem; }
+.top small { opacity: 0.8; font-size: 0.75rem; }
 
 .create {
   border: 0;
@@ -72,61 +44,42 @@ body {
   color: var(--blue);
   font-weight: 700;
   border-radius: 999px;
-  padding: 0.4rem 0.85rem;
+  padding: 0.45rem 0.9rem;
   cursor: pointer;
 }
 
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 148px 1fr;
+  grid-template-columns: 142px 1fr;
   min-height: 0;
 }
 
-.accounts {
+.rail {
   border-right: 1px solid var(--line);
-  background: var(--surface);
-  padding: 0.65rem 0.55rem;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.75rem 0.55rem;
   overflow: auto;
 }
 
-.accounts-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.45rem;
-}
-
-.accounts-head h2 {
-  margin: 0;
+.label {
+  margin: 0 0 0.4rem;
+  padding: 0 0.3rem;
   font-size: 0.68rem;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--faint);
 }
 
-.accounts-head button {
-  border: 0;
-  background: rgba(11, 95, 255, 0.1);
-  color: var(--blue-deep);
-  font-size: 0.72rem;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 0.2rem 0.45rem;
-  cursor: pointer;
-}
-
-.account-list {
-  display: grid;
-  gap: 0.3rem;
-}
+.account-list { display: grid; gap: 0.3rem; }
 
 .account {
   width: 100%;
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 10px;
-  padding: 0.4rem;
+  border-radius: 12px;
+  padding: 0.45rem;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.4rem;
@@ -136,9 +89,9 @@ body {
 }
 
 .account[data-active="true"] {
-  border-color: var(--line);
   background: #fff;
-  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.08);
+  border-color: var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .avatar {
@@ -160,106 +113,88 @@ body {
   white-space: nowrap;
 }
 
+.link {
+  margin-top: 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 650;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.3rem;
+}
+
 .add-form {
-  margin-top: 0.5rem;
+  margin-top: 0.45rem;
   display: grid;
   gap: 0.35rem;
 }
 
-.add-form.hidden {
-  display: none;
-}
+.add-form.hidden { display: none; }
 
 .add-form input,
-.composer textarea {
+.field input,
+.field select,
+.field textarea {
   width: 100%;
-  border: 1px solid #dfe1e6;
-  border-radius: 8px;
-  padding: 0.5rem 0.55rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
   font: inherit;
+  background: #fff;
 }
 
 .add-form button {
   border: 0;
   background: var(--blue);
   color: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.45rem;
   font-weight: 650;
   cursor: pointer;
 }
 
 .session {
-  margin: 0.75rem 0 0;
+  margin: 0.8rem 0 0;
   font-size: 0.72rem;
   color: var(--faint);
   line-height: 1.35;
 }
 
 .main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-.chat {
-  flex: 1;
+  padding: 0.9rem;
   overflow: auto;
-  padding: 0.85rem;
   display: grid;
-  gap: 0.55rem;
+  gap: 0.75rem;
   align-content: start;
 }
 
-.bubble {
-  max-width: 100%;
-  padding: 0.65rem 0.75rem;
-  border-radius: 12px;
-  white-space: pre-wrap;
-  line-height: 1.4;
-  font-size: 0.88rem;
-  animation: rise 220ms ease both;
+.field { display: grid; gap: 0.35rem; }
+.field > span {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--soft);
 }
 
-.bubble.user {
-  background: rgba(11, 95, 255, 0.1);
-  color: var(--ink);
-  justify-self: end;
-}
-
-.bubble.assistant {
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-}
-
-.composer {
-  border-top: 1px solid var(--line);
-  background: #fff;
-  padding: 0.65rem;
+.row {
   display: grid;
-  gap: 0.45rem;
-}
-
-.composer-actions {
-  display: flex;
+  grid-template-columns: 1fr auto;
   gap: 0.4rem;
-  justify-content: flex-end;
 }
 
-button.ghost,
-button.primary {
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+button.primary,
+button.ghost {
   border: 0;
   border-radius: 999px;
-  padding: 0.45rem 0.8rem;
+  padding: 0.55rem 0.9rem;
   font-weight: 650;
   cursor: pointer;
-}
-
-button.ghost {
-  background: var(--canvas);
-  color: var(--soft);
 }
 
 button.primary {
@@ -267,13 +202,51 @@ button.primary {
   color: #fff;
 }
 
+button.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ink);
+}
+
+.out {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.bubble {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  animation: rise 220ms ease both;
+}
+
+.ticket {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+}
+
+.ticket strong { display: block; margin-bottom: 0.35rem; }
+.ticket pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--soft);
+  max-height: 10rem;
+  overflow: auto;
+}
+
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }

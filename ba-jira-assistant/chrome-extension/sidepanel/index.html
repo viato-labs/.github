@@ -3,50 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ticket Flow Agent</title>
+    <title>Ticket Flow</title>
     <link rel="stylesheet" href="panel.css" />
   </head>
   <body>
     <header class="top">
-      <div class="brand">
-        <span class="mark">T</span>
-        <div>
-          <strong>Ticket Flow</strong>
-          <small>Chrome agent · uses your login</small>
-        </div>
+      <div>
+        <strong>Ticket Flow</strong>
+        <small>Uses your Chrome Jira login</small>
       </div>
-      <button id="btn-create" class="create" type="button">Create</button>
+      <button id="btn-open" type="button" class="create">Open Jira</button>
     </header>
 
     <div class="layout">
-      <aside class="accounts" aria-label="Company accounts">
-        <div class="accounts-head">
-          <h2>Accounts</h2>
-          <button id="btn-add" type="button">+ Add</button>
-        </div>
+      <aside class="rail">
+        <p class="label">Accounts</p>
         <div id="account-list" class="account-list"></div>
+        <button id="btn-add-toggle" type="button" class="link">+ Add company</button>
         <form id="add-form" class="add-form hidden">
           <input id="add-name" placeholder="Company name" required />
-          <input id="add-project" placeholder="Default project key" />
-          <button type="submit">Save account</button>
+          <input id="add-url" placeholder="https://company.atlassian.net" required />
+          <button type="submit">Save</button>
         </form>
-        <p id="session-line" class="session">Open a Jira tab while logged in.</p>
+        <p id="session" class="session">Open Jira while logged in.</p>
       </aside>
 
       <main class="main">
-        <div id="chat" class="chat" aria-live="polite"></div>
-        <form id="composer" class="composer">
-          <textarea
-            id="input"
-            rows="3"
-            placeholder="Paste a brief, or try: search calendar · move BAU-12 to In Analysis confirm · create confirm"
-          ></textarea>
-          <div class="composer-actions">
-            <button id="btn-tools" type="button" class="ghost">Tools</button>
-            <button id="btn-session" type="button" class="ghost">Check login</button>
-            <button type="submit" class="primary">Send</button>
+        <label class="field">
+          <span>Jira URL</span>
+          <div class="row">
+            <input id="jira-url" placeholder="https://christies.atlassian.net" />
+            <button id="btn-save-url" type="button" class="ghost">Save</button>
           </div>
-        </form>
+        </label>
+
+        <label class="field">
+          <span>Tickets are for</span>
+          <select id="audience">
+            <option value="both">Dev + QA</option>
+            <option value="dev">Developers</option>
+            <option value="qa">QA</option>
+            <option value="analysis">Analysis first</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Guidance</span>
+          <textarea
+            id="guidance"
+            rows="7"
+            placeholder="Paste the brief, notes, or “turn this into tickets”. Add Figma/Confluence links below. I’ll write like you, using existing Jira + Confluence context."
+          ></textarea>
+        </label>
+
+        <label class="field">
+          <span>Links (Figma, Confluence, docs)</span>
+          <textarea id="links" rows="3" placeholder="One URL per line"></textarea>
+        </label>
+
+        <div class="actions">
+          <button id="btn-session" type="button" class="ghost">Check login</button>
+          <button id="btn-draft" type="button" class="primary">Research & draft</button>
+          <button id="btn-create" type="button" class="primary" disabled>Create in Jira</button>
+        </div>
+
+        <div id="out" class="out" aria-live="polite"></div>
       </main>
     </div>
 

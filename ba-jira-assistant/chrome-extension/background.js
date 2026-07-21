@@ -2,22 +2,21 @@ import {
   addAccount,
   loadAccounts,
   matchAccountForHost,
+  saveAccountUrl,
   setActiveAccount,
 } from "./lib/accounts.js";
-import { draftFromBrief, draftToPastePack } from "./lib/draft.js";
+import { draftsFromGuidance, draftToPastePack } from "./lib/draft.js";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 });
 
 async function getActiveJiraTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tab = tabs[0];
   if (!tab?.id || !tab.url) throw new Error("No active tab");
-  const ok =
-    /https:\/\/[^/]+\.(atlassian\.net|jira\.com)\//i.test(tab.url) ||
-    /atlassian\.net/i.test(tab.url);
-  if (!ok) {
-    throw new Error("Open your company Jira tab in Chrome first (*.atlassian.net)");
+  if (!/atlassian\.net|jira\.com/i.test(tab.url)) {
+    throw new Error("Open this company’s Jira tab (logged in), then try again");
   }
   return tab;
 }
@@ -47,7 +46,9 @@ async function callJira(method, payload = {}) {
 
 async function executeTool(name, params = {}, session = {}) {
   const { accounts, activeAccountId } = await loadAccounts();
-  let account = accounts.find((a) => a.id === (session.activeAccountId || activeAccountId));
+  let account = accounts.find(
+    (a) => a.id === (session.activeAccountId || activeAccountId),
+  );
 
   switch (name) {
     case "detect_session": {
@@ -59,9 +60,13 @@ async function executeTool(name, params = {}, session = {}) {
           await setActiveAccount(matched.id);
           account = matched;
         }
+        if (account && !account.jiraUrl) {
+          await saveAccountUrl(account.id, `${new URL(tab.url).origin}`);
+          account = (await loadAccounts()).accounts.find((a) => a.id === account.id);
+        }
         return {
           message: `Signed in as ${data.displayName} on ${host}${
-            account ? ` · account ${account.name}` : ""
+            account ? ` · ${account.name}` : ""
           }`,
           user: data,
           host,
@@ -71,108 +76,141 @@ async function executeTool(name, params = {}, session = {}) {
         return { message: error.message, account };
       }
     }
+    case "open_jira": {
+      if (!account?.jiraUrl) {
+        throw new Error("Add the Jira URL for this account first");
+      }
+      await chrome.tabs.create({ url: account.jiraUrl });
+      return { message: `Opening ${account.name} Jira… log in if needed, then come back.` };
+    }
     case "list_accounts": {
       return {
-        message: accounts.map((a) => `• ${a.name} (${a.defaultProjectKey})`).join("\n"),
+        message: accounts
+          .map((a) => `• ${a.name}${a.jiraUrl ? ` — ${a.jiraUrl}` : " — URL missing"}`)
+          .join("\n"),
         accounts,
         activeAccountId,
       };
     }
     case "switch_account": {
-      const q = String(params.account || "").toLowerCase();
+      const q = String(params.account || "").toLowerCase().replace(/^to\s+/, "");
       const found = accounts.find(
         (a) =>
           a.id === q ||
           a.slug === q ||
           a.name.toLowerCase() === q ||
-          a.name.toLowerCase().includes(q.replace(/^to\s+/, "")),
+          a.name.toLowerCase().includes(q),
       );
       if (!found) throw new Error(`Unknown account: ${params.account}`);
       await setActiveAccount(found.id);
-      return { message: `Switched to ${found.name}`, account: found };
+      return { message: `Working in ${found.name}`, account: found };
     }
     case "add_account": {
       const result = await addAccount({
         name: params.name,
+        jiraUrl: params.jiraUrl,
         defaultProjectKey: params.projectKey,
-        hostHint: params.hostHint,
       });
       const created = result.accounts.find((a) => a.id === result.activeAccountId);
-      return { message: `Added account ${created.name}`, account: created, ...result };
+      return { message: `Added ${created.name}`, account: created, ...result };
     }
-    case "draft_ticket": {
-      if (!account) throw new Error("Pick a company account first");
-      const draft = draftFromBrief(params.brief, account);
+    case "save_jira_url": {
+      const result = await saveAccountUrl(
+        params.accountId || activeAccountId,
+        params.jiraUrl,
+      );
+      const updated = result.accounts.find((a) => a.id === result.activeAccountId);
+      return { message: `Saved Jira URL for ${updated.name}`, account: updated, ...result };
+    }
+    case "search_context": {
+      const query = params.query || params.guidance || "";
+      let jiraIssues = [];
+      let pages = [];
+      try {
+        const jira = await callJira("search", { query });
+        jiraIssues = jira.data.issues || [];
+      } catch {
+        /* optional if tab not open */
+      }
+      try {
+        const conf = await callJira("searchConfluence", { query });
+        pages = conf.data.pages || [];
+      } catch {
+        /* optional */
+      }
+      const note = [
+        jiraIssues.length ? "Related Jira:" : "",
+        ...jiraIssues.map((i) => `- ${i.key}: ${i.summary}`),
+        pages.length ? "Related Confluence:" : "",
+        ...pages.map((p) => `- ${p.title}${p.url ? ` (${p.url})` : ""}`),
+      ]
+        .filter(Boolean)
+        .join("\n");
       return {
-        message: `Drafted for ${account.name}:\n• ${draft.summary}\n• ${draft.projectKey} / ${draft.issueType}\nSay **create confirm** to publish with your Chrome login.`,
-        draft,
+        message: note || "No live context found — open the company Jira tab while logged in.",
+        jiraIssues,
+        pages,
+        researchNote: note,
       };
     }
-    case "create_ticket": {
-      if (!params.confirm) throw new Error("Pass confirm: true to create");
-      const draft = params.draft || session.draft;
-      if (!draft) throw new Error("No draft to create — draft a brief first");
-      const { data } = await callJira("createIssue", { draft });
-      let transitionNote = "";
-      if (draft.postCreateStatus) {
-        try {
-          await callJira("transitionIssue", {
-            issueKey: data.key,
-            targetStatus: draft.postCreateStatus,
-          });
-          transitionNote = ` Moved toward ${draft.postCreateStatus}.`;
-        } catch (error) {
-          transitionNote = ` (status move skipped: ${error.message})`;
+    case "draft_from_guidance": {
+      if (!account) throw new Error("Pick a company account first");
+      const guidance = params.guidance || "";
+      if (!guidance.trim()) throw new Error("Guidance is empty");
+      let researchNote = "";
+      try {
+        const ctx = await executeTool(
+          "search_context",
+          { query: guidance.slice(0, 180) },
+          session,
+        );
+        researchNote = ctx.researchNote || "";
+      } catch {
+        researchNote = "";
+      }
+      const drafts = draftsFromGuidance({
+        guidance,
+        links: params.links || [],
+        audience: params.audience || "both",
+        account,
+        researchNote,
+      });
+      return {
+        message: `Drafted ${drafts.length} ticket(s) for ${account.name} in your voice.\n${drafts
+          .map((d, i) => `${i + 1}. ${d.summary}`)
+          .join("\n")}\n\nSay create confirm when they look right.`,
+        drafts,
+      };
+    }
+    case "create_tickets": {
+      if (!params.confirm) throw new Error("Pass confirm: true");
+      const drafts = params.drafts || session.drafts || [];
+      if (!drafts.length) throw new Error("No drafts — research & draft first");
+      const created = [];
+      for (const draft of drafts) {
+        const { data } = await callJira("createIssue", { draft });
+        if (draft.postCreateStatus) {
+          try {
+            await callJira("transitionIssue", {
+              issueKey: data.key,
+              targetStatus: draft.postCreateStatus,
+            });
+          } catch {
+            /* optional */
+          }
         }
+        created.push(data);
       }
       return {
-        message: `Created ${data.key} as you.${transitionNote}\n${data.url}`,
-        issue: data,
-      };
-    }
-    case "search_jira": {
-      const { data } = await callJira("search", { query: params.query });
-      if (!data.issues?.length) return { message: "No issues found.", issues: [] };
-      return {
-        message: data.issues
-          .map((i) => `• ${i.key}: ${i.summary}${i.status ? ` [${i.status}]` : ""}`)
-          .join("\n"),
-        issues: data.issues,
-      };
-    }
-    case "read_issue": {
-      const { data } = await callJira("readIssue", { issueKey: params.issueKey });
-      return {
-        message: `${data.key}: ${data.summary}\nStatus: ${data.status} · ${data.projectKey} / ${data.issueType}`,
-        issue: data,
-      };
-    }
-    case "list_transitions": {
-      const { data } = await callJira("listTransitions", {
-        issueKey: params.issueKey,
-      });
-      return {
-        message: data.transitions.length
-          ? `Allowed moves for ${params.issueKey}:\n` +
-            data.transitions.map((t) => `• ${t.name} → ${t.toStatus}`).join("\n")
-          : `No transitions available for ${params.issueKey}`,
-        transitions: data.transitions,
-      };
-    }
-    case "move_status": {
-      if (!params.confirm) throw new Error("Pass confirm: true to move status");
-      await callJira("transitionIssue", {
-        issueKey: params.issueKey,
-        targetStatus: params.status,
-      });
-      return {
-        message: `Moved ${params.issueKey} toward ${params.status}`,
+        message: `Created ${created.length} ticket(s) as you:\n${created
+          .map((c) => `• ${c.key} — ${c.url}`)
+          .join("\n")}`,
+        issues: created,
       };
     }
     case "copy_paste_pack": {
-      const draft = params.draft || session.draft;
-      if (!draft) throw new Error("No draft");
-      const pastePack = draftToPastePack(draft);
+      const drafts = params.drafts || session.drafts || [];
+      const pastePack = drafts.map(draftToPastePack).join("\n\n---\n\n");
       return { message: "Paste pack ready.", pastePack };
     }
     default:

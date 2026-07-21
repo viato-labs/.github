@@ -1,67 +1,28 @@
-# Ticket Flow Chrome Agent (recommended)
+# Ticket Flow Chrome Agent
 
-Use an **AI agent inside Chrome** that acts with **your already-logged-in Jira session**.  
-No API token. No Cursor plugin required. Company accounts (Christie's, McLaren, others) switch in the side panel.
+An AI BA agent in Chrome that uses **your already-logged-in Jira session**.
 
-## Why this path
+## What you do
 
-Corporate Jira (Christie's, McLaren, …) already has Microsoft SSO in the browser.  
-A Chrome extension can call Jira REST **from the open Jira tab**, so cookies / SSO session are reused safely.
+1. Add each company with its **Jira URL** (Christie's, McLaren, …)
+2. Open that Jira and log in as usual
+3. Paste **guidance** — notes, docs, screenshots context, Figma / Confluence links
+4. Choose who tickets are for: **Dev + QA**, Developers, QA, or Analysis first
+5. **Research & draft** — searches related Jira + Confluence so wording matches what’s already there
+6. **Create in Jira** — as you
 
-| Piece | Role |
-|---|---|
-| Chrome side panel | Chat agent + account switcher |
-| Content script on `*.atlassian.net` | Runs tools using your session |
-| Built-in tools | Draft, create, search, read, list transitions, move status, paste pack |
-| Next.js app (optional) | Heavier bulk Excel / local playbooks if you still want a website |
+No Cursor plugin. No API token. Confirm before create.
 
-## Install (Load unpacked)
+## Install
 
-1. Open Chrome → `chrome://extensions`
-2. Enable **Developer mode**
-3. **Load unpacked** → select  
-   `ba-jira-assistant/chrome-extension`
+1. Chrome → `chrome://extensions`
+2. Developer mode → **Load unpacked**
+3. Select `ba-jira-assistant/chrome-extension`
 4. Pin **Ticket Flow Agent**
-5. Log into the company Jira site in a normal tab
-6. Click the extension icon → side panel opens
 
-## Daily use
+## Why this shape
 
-1. Open Christie's or McLaren Jira (logged in)
-2. Pick the matching **Account** on the left (or **+ Add**)
-3. Click **Check login** once
-4. Paste a brief → agent drafts
-5. Say `create confirm` → creates **as you**
-6. Optional: `move BAU-123 to In Analysis confirm`
+The job is not “pick a task type from a menu”.  
+It’s: **use my login + this guidance + existing product context → write tickets like I would**.
 
-### Example prompts
-
-- `Buyers need to save a lot from search. Epic: Discovery.`
-- `create confirm`
-- `search calendar`
-- `read BAU-45`
-- `move BAU-45 to In Analysis confirm`
-- `switch McLaren`
-- `add account Acme` (then set default project when prompted via + Add form)
-
-## Tools (outside Cursor)
-
-These run in Chrome, not in the Cursor agent plugin:
-
-- `detect_session` — who you’re logged in as
-- `list_accounts` / `switch_account` / `add_account`
-- `draft_ticket` / `create_ticket` / `copy_paste_pack`
-- `search_jira` / `read_issue`
-- `list_transitions` / `move_status`
-
-## Safety
-
-- Never asks for your Microsoft password
-- Create / status moves require an explicit **confirm**
-- No delete tool
-- Each company account keeps its own defaults (project, SCO prefix, In Analysis, …)
-
-## Relationship to the web app
-
-The Next.js “Ticket Flow” site remains useful for bulk spreadsheet playbooks and OAuth experiments.  
-For day-to-day BA work while already in Jira, prefer this Chrome agent.
+Figma links and screenshots are treated as design/context references in the draft. Live Figma API parsing can come later; the link and your notes still drive clear Dev/QA tickets today.

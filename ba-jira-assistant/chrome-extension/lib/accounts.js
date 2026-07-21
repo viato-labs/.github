@@ -1,10 +1,11 @@
-/** Built-in company profiles + user-added accounts (chrome.storage). */
+/** Company accounts with Jira URLs the BA logs into. */
 
 export const SEED_ACCOUNTS = [
   {
     id: "christies",
     name: "Christie's",
     slug: "christies",
+    jiraUrl: "",
     hostHints: ["christies", "chr"],
     defaultProjectKey: "BAU",
     defaultEpicKey: "BAU",
@@ -16,6 +17,7 @@ export const SEED_ACCOUNTS = [
     id: "mclaren",
     name: "McLaren",
     slug: "mclaren",
+    jiraUrl: "",
     hostHints: ["mclaren", "mcl"],
     defaultProjectKey: "CFG",
     defaultEpicKey: "Configurator",
@@ -44,15 +46,36 @@ export function colorFor(slug) {
   return COLORS[hash % COLORS.length];
 }
 
+function hostFromUrl(jiraUrl) {
+  try {
+    return new URL(jiraUrl).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export async function loadAccounts() {
   const stored = await chrome.storage.local.get(["accounts", "activeAccountId"]);
   const custom = Array.isArray(stored.accounts) ? stored.accounts : [];
   const byId = new Map();
   for (const account of [...SEED_ACCOUNTS, ...custom]) {
-    byId.set(account.id, {
+    const merged = {
       ...account,
       color: account.color || colorFor(account.slug || account.id),
-    });
+      jiraUrl: account.jiraUrl || "",
+    };
+    // Prefer custom overrides for seed ids (e.g. saved Jira URL)
+    const existingCustom = custom.find((c) => c.id === merged.id);
+    byId.set(merged.id, existingCustom ? { ...merged, ...existingCustom, color: existingCustom.color || merged.color } : merged);
+  }
+  // Re-add custom-only
+  for (const account of custom) {
+    if (!byId.has(account.id)) {
+      byId.set(account.id, {
+        ...account,
+        color: account.color || colorFor(account.slug || account.id),
+      });
+    }
   }
   const accounts = [...byId.values()];
   const activeAccountId =
@@ -67,43 +90,60 @@ export async function setActiveAccount(accountId) {
   return loadAccounts();
 }
 
-export async function addAccount({ name, hostHint, defaultProjectKey }) {
-  const trimmed = String(name || "").trim();
-  if (!trimmed) throw new Error("Company name is required");
-  const slug = trimmed
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+export async function upsertAccount(input) {
+  const name = String(input.name || "").trim();
+  if (!name) throw new Error("Company name is required");
+  const jiraUrl = String(input.jiraUrl || "").trim().replace(/\/$/, "");
+  const slug =
+    input.id ||
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  const host = hostFromUrl(jiraUrl);
   const stored = await chrome.storage.local.get(["accounts"]);
   const custom = Array.isArray(stored.accounts) ? stored.accounts : [];
-  if (
-    SEED_ACCOUNTS.some((a) => a.id === slug) ||
-    custom.some((a) => a.id === slug || a.slug === slug)
-  ) {
-    throw new Error(`Account already exists: ${trimmed}`);
-  }
-  const account = {
+  const next = {
     id: slug,
-    name: trimmed,
+    name,
     slug,
-    hostHints: [hostHint || slug].filter(Boolean),
-    defaultProjectKey: (defaultProjectKey || "PROJ").toUpperCase(),
-    defaultEpicKey: "",
-    defaultPostCreateStatus: "To Do",
-    summaryPrefix: "",
+    jiraUrl,
+    hostHints: [host.split(".")[0], slug].filter(Boolean),
+    defaultProjectKey: (input.defaultProjectKey || "PROJ").toUpperCase(),
+    defaultEpicKey: input.defaultEpicKey || "",
+    defaultPostCreateStatus: input.defaultPostCreateStatus || "To Do",
+    summaryPrefix: input.summaryPrefix || "",
     color: colorFor(slug),
     custom: true,
   };
-  custom.push(account);
-  await chrome.storage.local.set({ accounts: custom, activeAccountId: account.id });
+  const idx = custom.findIndex((a) => a.id === slug);
+  if (idx >= 0) custom[idx] = { ...custom[idx], ...next };
+  else custom.push(next);
+  await chrome.storage.local.set({ accounts: custom, activeAccountId: slug });
   return loadAccounts();
+}
+
+export async function addAccount(input) {
+  return upsertAccount(input);
+}
+
+export async function saveAccountUrl(accountId, jiraUrl) {
+  const { accounts } = await loadAccounts();
+  const current = accounts.find((a) => a.id === accountId);
+  if (!current) throw new Error("Account not found");
+  return upsertAccount({ ...current, jiraUrl });
 }
 
 export function matchAccountForHost(accounts, hostname) {
   const host = String(hostname || "").toLowerCase();
   return (
-    accounts.find((account) =>
-      (account.hostHints || []).some((hint) => host.includes(String(hint).toLowerCase())),
-    ) || null
+    accounts.find((account) => {
+      if (account.jiraUrl && hostFromUrl(account.jiraUrl).toLowerCase() === host) {
+        return true;
+      }
+      return (account.hostHints || []).some((hint) =>
+        host.includes(String(hint).toLowerCase()),
+      );
+    }) || null
   );
 }

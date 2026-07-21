@@ -1,167 +1,83 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  bulkPackMarkdown,
-  draftDescriptionForPaste,
-  draftSummaryForPaste,
-} from "@/lib/export/clipboard";
-import type {
-  ChatMessage,
-  CompanySummary,
-  PlaybookId,
-  ResearchBundle,
-  TicketDraft,
-  WorkflowTransition,
-} from "@/lib/types";
+import type { CompanySummary, ResearchBundle, TicketDraft } from "@/lib/types";
+import type { TicketAudience } from "@/lib/guidance/draft";
 
 type AuthStatus = {
-  ok: boolean;
-  dryRun: boolean;
-  connected?: boolean;
-  mode?: string;
   message: string;
   oauthAppConfigured?: boolean;
   oauthConnected?: boolean;
-  companyName?: string;
   connection?: {
     oauthConnected?: boolean;
     oauthAccountName?: string;
     oauthSiteName?: string;
+    baseUrl?: string;
   };
 };
 
-type WizardStep = 1 | 2 | 3 | 4;
-type TaskId = "brief" | "bulk" | "update" | "move" | "paste";
+type Preview = {
+  summary: string;
+  projectKey: string;
+  intent: string;
+  confidence: number;
+  markdown: string;
+  draft: TicketDraft;
+};
 
-const TASKS: Array<{
-  id: TaskId;
-  title: string;
-  description: string;
-  hint: string;
-  icon: string;
-}> = [
+const AUDIENCE_OPTIONS: Array<{ id: TicketAudience; label: string; help: string }> = [
   {
-    id: "brief",
-    title: "Write one ticket",
-    description: "Paste a short brief, research history, then create in Jira.",
-    hint: "Best for a single story or bug.",
-    icon: "✎",
+    id: "both",
+    label: "Dev + QA",
+    help: "A build ticket and a QA companion, written like you’d brief the team.",
   },
   {
-    id: "bulk",
-    title: "Bulk from Excel",
-    description: "Upload a sheet and draft many tickets with a company playbook.",
-    hint: "Christie’s engagement sheets → SCO on BAU.",
-    icon: "▦",
+    id: "dev",
+    label: "Developers",
+    help: "Implementation-focused stories with clear done-when language.",
   },
   {
-    id: "update",
-    title: "Update a ticket",
-    description: "Draft improvements, then update a Jira key as you.",
-    hint: "Never deletes. Only updates you confirm.",
-    icon: "↻",
+    id: "qa",
+    label: "QA",
+    help: "Human Gherkin coverage for how a real user would try it.",
   },
   {
-    id: "move",
-    title: "Move status",
-    description: "Preview allowed workflow transitions, then confirm the move.",
-    hint: "Christie’s often: In Analysis.",
-    icon: "→",
-  },
-  {
-    id: "paste",
-    title: "Copy / paste",
-    description: "Generate text you can paste into Jira manually.",
-    hint: "Fallback if you’re not signed in yet.",
-    icon: "⧉",
+    id: "analysis",
+    label: "Analysis first",
+    help: "One discovery ticket before we split build/QA work.",
   },
 ];
 
-const ACCOUNT_COLORS = [
-  "#6554C0",
-  "#0B5FFF",
-  "#00875A",
-  "#FF5630",
-  "#00A3BF",
-  "#FF8B00",
-];
+const COLORS = ["#6554C0", "#0B5FFF", "#00875A", "#FF5630", "#00A3BF", "#FF8B00"];
 
-function stepLabel(step: WizardStep) {
-  switch (step) {
-    case 1:
-      return "Sign in";
-    case 2:
-      return "Task";
-    case 3:
-      return "Work";
-    case 4:
-      return "Review";
-  }
-}
-
-function companyInitials(name: string) {
+function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
+  if (!parts.length) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function companyColor(slug: string) {
+function colorFor(slug: string) {
   let hash = 0;
   for (let i = 0; i < slug.length; i += 1) hash = (hash + slug.charCodeAt(i) * 17) % 997;
-  return ACCOUNT_COLORS[hash % ACCOUNT_COLORS.length];
-}
-
-function uid() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      const base64 = result.includes(",") ? result.split(",")[1] : result;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+  return COLORS[hash % COLORS.length];
 }
 
 export default function Home() {
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState("");
-  const [playbookId, setPlaybookId] = useState<PlaybookId>("single-brief");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState(
-    "Buyers need to save a lot from search results on web. Epic: Discovery. Priority: High. Users can save and see it in My Lots.",
-  );
-  const [files, setFiles] = useState<string[]>([]);
-  const [draft, setDraft] = useState<TicketDraft | null>(null);
-  const [bulkDrafts, setBulkDrafts] = useState<TicketDraft[]>([]);
-  const [bulkSummaries, setBulkSummaries] = useState<string[]>([]);
-  const [preview, setPreview] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [lastResult, setLastResult] = useState("");
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [newCompanyName, setNewCompanyName] = useState("");
-  const [editKey, setEditKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [guidance, setGuidance] = useState("");
+  const [links, setLinks] = useState("");
+  const [files, setFiles] = useState<string[]>([]);
+  const [audience, setAudience] = useState<TicketAudience>("both");
+  const [previews, setPreviews] = useState<Preview[]>([]);
   const [research, setResearch] = useState<ResearchBundle | null>(null);
-  const [moveAfterCreate, setMoveAfterCreate] = useState(true);
-  const [postCreateStatus, setPostCreateStatus] = useState("In Analysis");
-  const [transitionKey, setTransitionKey] = useState("");
-  const [availableTransitions, setAvailableTransitions] = useState<
-    WorkflowTransition[]
-  >([]);
-  const [currentStatus, setCurrentStatus] = useState("");
-  const [selectedTransitionId, setSelectedTransitionId] = useState("");
-  const [targetStatusShortcut, setTargetStatusShortcut] = useState("In Analysis");
-  const [step, setStep] = useState<WizardStep>(1);
-  const [task, setTask] = useState<TaskId>("brief");
-  const [transitionConfirm, setTransitionConfirm] = useState(false);
-  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [jiraUrlDraft, setJiraUrlDraft] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newJiraUrl, setNewJiraUrl] = useState("");
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
@@ -172,19 +88,10 @@ export default function Home() {
     authStatus?.oauthConnected || authStatus?.connection?.oauthConnected,
   );
 
-  const selectedTask = TASKS.find((item) => item.id === task)!;
-  const hasReview = Boolean(draft || bulkDrafts.length || preview);
-
-  function applyCompanyWorkflowDefaults(company?: CompanySummary | null) {
-    if (!company?.workflow) return;
-    const defaultStatus =
-      company.workflow.defaultPostCreateStatus ||
-      company.workflow.commonStatuses[0] ||
-      "In Analysis";
-    setPostCreateStatus(defaultStatus);
-    setTargetStatusShortcut(defaultStatus);
-    setMoveAfterCreate(Boolean(company.workflow.enablePostCreateTransition));
-  }
+  const jiraUrl =
+    activeCompany?.connection.baseUrl ||
+    activeCompany?.connection.oauthSiteName ||
+    "";
 
   async function refreshCompanies(preferredId?: string) {
     const response = await fetch("/api/companies");
@@ -199,104 +106,108 @@ export default function Home() {
     const response = await fetch(
       `/api/auth/atlassian/status?companyId=${companyId}`,
     );
-    const data = await response.json();
-    setAuthStatus(data);
+    setAuthStatus(await response.json());
   }
 
   useEffect(() => {
     void (async () => {
       const params = new URLSearchParams(window.location.search);
-      const oauth = params.get("oauth");
-      const preferredCompany = params.get("companyId") || undefined;
-      const companyId = await refreshCompanies(preferredCompany || undefined);
-      await refreshAuth(companyId);
-
-      if (oauth === "success") {
-        setLastResult("Signed in with Microsoft/Atlassian — app can act as you in Jira");
-        setStep(2);
-        window.history.replaceState({}, "", "/");
-      } else if (oauth === "error") {
-        setLastResult(params.get("message") || "OAuth sign-in failed");
-        setStep(1);
-        window.history.replaceState({}, "", "/");
-      }
-
-      const companyRes = await fetch(`/api/chat?companyId=${companyId}`);
-      const companyData = await companyRes.json();
-      setMessages([
-        {
-          id: "welcome",
-          role: "assistant",
-          createdAt: new Date().toISOString(),
-          content: `Working in **${companyData.company.name}**. Sign in, pick a task, then follow the steps.`,
-        },
-      ]);
-      setPlaybookId(
-        (companyData.company.playbooks?.[0]?.id as PlaybookId) || "single-brief",
+      const companyId = await refreshCompanies(
+        params.get("companyId") || undefined,
       );
       const companiesRes = await fetch("/api/companies");
       const companiesData = await companiesRes.json();
-      const current = (companiesData.companies || []).find(
+      const selected = (companiesData.companies || []).find(
         (c: CompanySummary) => c.id === companyId,
       );
-      applyCompanyWorkflowDefaults(current);
+      setJiraUrlDraft(
+        selected?.connection.baseUrl || selected?.connection.oauthSiteName || "",
+      );
+      await refreshAuth(companyId);
+      if (params.get("oauth") === "success") {
+        setMessage("Signed in — I can research and create as you.");
+        window.history.replaceState({}, "", "/");
+      } else if (params.get("oauth") === "error") {
+        setMessage(params.get("message") || "Sign-in failed");
+        window.history.replaceState({}, "", "/");
+      }
     })();
   }, []);
-
-  async function copyText(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setLastResult(`Copied ${label}`);
-    } catch {
-      setLastResult(`Could not copy ${label}`);
-    }
-  }
-
-  function downloadBulkPack() {
-    if (!bulkDrafts.length) return;
-    const content = bulkPackMarkdown(bulkDrafts);
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${activeCompany?.slug || "company"}-ticket-pack.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setLastResult(`Downloaded ${bulkDrafts.length}-ticket pack`);
-  }
 
   async function switchCompany(companyId: string) {
     setBusy(true);
     try {
-      const switched = await fetch("/api/companies", {
+      await fetch("/api/companies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activeCompanyId: companyId }),
       });
-      const switchedData = await switched.json();
-      const nextCompanies = (switchedData.companies || []) as CompanySummary[];
-      setCompanies(nextCompanies);
+      const response = await fetch("/api/companies");
+      const data = await response.json();
+      const list = (data.companies || []) as CompanySummary[];
+      setCompanies(list);
       setActiveCompanyId(companyId);
-      await refreshAuth(companyId);
-      setDraft(null);
-      setBulkDrafts([]);
-      setBulkSummaries([]);
-      setPreview("");
-      setResearch(null);
-      const company = nextCompanies.find((c) => c.id === companyId);
-      setPlaybookId(
-        (company?.playbooks?.[0]?.id as PlaybookId) || "single-brief",
+      const selected = list.find((c) => c.id === companyId);
+      setJiraUrlDraft(
+        selected?.connection.baseUrl || selected?.connection.oauthSiteName || "",
       );
-      applyCompanyWorkflowDefaults(company);
-      setMessages([
-        {
-          id: uid(),
-          role: "assistant",
-          createdAt: new Date().toISOString(),
-          content: `Switched to **${company?.name || companyId}**. Sign in with Microsoft for this company if you want the app to create/edit Jira as you there.`,
-        },
-      ]);
-      setLastResult(`Working in ${company?.name || companyId}`);
+      setPreviews([]);
+      setResearch(null);
+      await refreshAuth(companyId);
+      setMessage(`Working in ${selected?.name || "account"}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveJiraUrl() {
+    if (!activeCompanyId || !jiraUrlDraft.trim()) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/companies/jira-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: activeCompanyId, jiraUrl: jiraUrlDraft }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save URL");
+      await refreshCompanies(activeCompanyId);
+      setMessage(`Saved Jira URL for ${data.company.name}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save URL");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addCompany() {
+    if (!newName.trim()) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim(), activate: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not add account");
+      if (newJiraUrl.trim()) {
+        await fetch("/api/companies/jira-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId: data.company.id,
+            jiraUrl: newJiraUrl.trim(),
+          }),
+        });
+      }
+      setNewName("");
+      setNewJiraUrl("");
+      await refreshCompanies(data.company.id);
+      await refreshAuth(data.company.id);
+      setMessage(`Added ${data.company.name}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not add account");
     } finally {
       setBusy(false);
     }
@@ -307,1197 +218,324 @@ export default function Home() {
     window.location.href = `/api/auth/atlassian/start?companyId=${encodeURIComponent(activeCompanyId)}`;
   }
 
-  async function signOut() {
-    if (!activeCompanyId) return;
-    setBusy(true);
-    try {
-      await fetch("/api/auth/atlassian/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: activeCompanyId }),
-      });
-      await refreshCompanies(activeCompanyId);
-      await refreshAuth(activeCompanyId);
-      setLastResult("Signed out of Jira for this company");
-    } finally {
-      setBusy(false);
+  async function onFiles(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    const texts: string[] = [];
+    for (const file of Array.from(fileList)) {
+      if (file.type.startsWith("image/")) {
+        texts.push(`FILE: ${file.name}\n[screenshot/image attached — use as visual guidance]`);
+        continue;
+      }
+      texts.push(`FILE: ${file.name}\n${await file.text()}`);
     }
+    setFiles((prev) => [...prev, ...texts].slice(-10));
+    setMessage(`Added ${fileList.length} file(s) to guidance`);
   }
 
-  async function sendBrief() {
-    const message = input.trim();
-    if (!message || busy || !activeCompanyId) return;
+  async function researchAndDraft() {
+    if (!guidance.trim() || !activeCompanyId) return;
     setBusy(true);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: uid(),
-        role: "user",
-        content: message,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
-
     try {
-      const response = await fetch("/api/chat", {
+      const linkList = links
+        .split(/\n|,/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const response = await fetch("/api/guidance/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message,
+          companyId: activeCompanyId,
+          guidance,
+          links: linkList,
           files,
-          companyId: activeCompanyId,
-          playbookId:
-            playbookId === "bulk-rows" ||
-            playbookId === "field-trip-by-engagement" ||
-            playbookId === "configurator-design-sections"
-              ? "single-brief"
-              : playbookId,
+          audience,
+          research: true,
         }),
       });
       const data = await response.json();
-      setDraft(data.draft);
+      if (!response.ok) throw new Error(data.error || "Draft failed");
+      setPreviews(data.previews || []);
       setResearch(data.research || null);
-      setBulkDrafts([]);
-      setBulkSummaries([]);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: signedIn
-            ? `${data.reply}\n\nSigned in — researched Jira/Confluence and ready to create as you.`
-            : `${data.reply}\n\nNot signed in — you can still copy/paste, or sign in to create in Jira.`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      setPreview(
-        (
-          await (
-            await fetch("/api/tickets/preview", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ draft: data.draft }),
-            })
-          ).json()
-        ).markdown || "",
-      );
-      setLastResult("Draft ready — review, then create or copy.");
-      setStep(4);
-    } catch {
-      setLastResult("Something went wrong while drafting. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createTicket() {
-    if (!draft || busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/tickets/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          draft,
-          companyId: activeCompanyId,
-          transitionToStatus: moveAfterCreate ? postCreateStatus : null,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Create failed");
-        return;
-      }
-      const result = data.result;
-      const transitionNote = result.transition?.message
-        ? ` ${result.transition.message}`
-        : "";
-      setLastResult(
-        `${result.dryRun ? "Dry-run" : "Created"} ${result.key} as you in ${data.company.name}.${transitionNote}`,
-      );
-      if (result.key) setTransitionKey(result.key);
-      setPreview(result.previewMarkdown || preview);
-      await refreshCompanies(activeCompanyId);
-    } catch {
-      setLastResult("Create request failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function updateTicket() {
-    if (!draft || !editKey.trim() || busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/tickets/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          issueKey: editKey.trim(),
-          draft,
-          companyId: activeCompanyId,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Update failed");
-        return;
-      }
-      setLastResult(`Updated ${data.result.key} as you`);
-    } catch {
-      setLastResult("Update request failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createBulkDrafts() {
-    if (!bulkDrafts.length || busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/tickets/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: activeCompanyId,
-          drafts: bulkDrafts,
-          transitionToStatus: moveAfterCreate ? postCreateStatus : null,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Bulk create failed");
-        return;
-      }
-      const createdCount = data.results?.length || 0;
-      const dryRun = data.results?.[0]?.dryRun;
-      const moved = (data.results || []).filter(
-        (r: { transition?: { dryRun?: boolean; toStatus?: string } }) =>
-          r.transition && !r.transition.dryRun,
-      ).length;
-      setLastResult(
-        `${createdCount} ticket(s) ${dryRun ? "dry-run" : "created"} as you for ${data.company.name}${
-          moveAfterCreate ? ` · ${moved} moved toward ${postCreateStatus}` : ""
+      setMessage(
+        `Drafted ${data.previews?.length || 0} ticket(s) for ${data.company.name}${
+          data.research
+            ? ` · used ${data.research.jiraHits?.length || 0} Jira + ${data.research.confluenceHits?.length || 0} Confluence matches`
+            : " · sign in for live Jira/Confluence research"
         }`,
       );
-      await refreshCompanies(activeCompanyId);
-    } catch {
-      setLastResult("Bulk create failed");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Draft failed");
     } finally {
       setBusy(false);
     }
   }
 
-  async function loadTransitions() {
-    if (!transitionKey.trim() || !activeCompanyId || busy) return;
+  async function createAll() {
+    if (!previews.length || !signedIn) return;
     setBusy(true);
     try {
-      const response = await fetch(
-        `/api/tickets/transitions?issueKey=${encodeURIComponent(transitionKey.trim())}&companyId=${encodeURIComponent(activeCompanyId)}`,
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Could not load transitions");
-        return;
-      }
-      setAvailableTransitions(data.transitions || []);
-      setCurrentStatus(data.currentStatus || "");
-      setSelectedTransitionId(data.transitions?.[0]?.id || "");
-      setTransitionConfirm(false);
-      setLastResult(
-        `${transitionKey.trim()} is in ${data.currentStatus || "unknown"}. ${data.transitions?.length || 0} move(s) available.`,
-      );
-    } catch {
-      setLastResult("Could not load transitions");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function applyTransition(confirm: boolean) {
-    if (!transitionKey.trim() || !activeCompanyId || busy) return;
-    if (confirm && !transitionConfirm) {
-      setLastResult("Tick the confirmation box before moving the ticket.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const response = await fetch("/api/tickets/transitions", {
+      const response = await fetch("/api/tickets/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId: activeCompanyId,
-          issueKey: transitionKey.trim(),
-          targetStatus: targetStatusShortcut,
-          transitionId: confirm ? selectedTransitionId || undefined : undefined,
-          confirm,
+          drafts: previews.map((p) => p.draft),
         }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Transition failed");
-        return;
-      }
-      setAvailableTransitions(data.result?.availableTransitions || []);
-      setLastResult(data.result?.message || "Transition checked");
-      if (confirm) {
-        const refresh = await fetch(
-          `/api/tickets/transitions?issueKey=${encodeURIComponent(transitionKey.trim())}&companyId=${encodeURIComponent(activeCompanyId)}`,
-        );
-        const refreshData = await refresh.json();
-        if (refresh.ok) {
-          setAvailableTransitions(refreshData.transitions || []);
-          setCurrentStatus(refreshData.currentStatus || "");
-          setSelectedTransitionId(refreshData.transitions?.[0]?.id || "");
-          setTransitionConfirm(false);
-        }
-      }
-    } catch {
-      setLastResult("Transition request failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runBulk(file?: File) {
-    if (!activeCompanyId || busy) return;
-    setBusy(true);
-    try {
-      const payload: Record<string, unknown> = {
-        companyId: activeCompanyId,
-        playbookId,
-        create: false,
-        useKnowledgeSections: playbookId === "configurator-design-sections",
-      };
-
-      if (file) {
-        payload.fileName = file.name;
-        payload.fileBase64 = await fileToBase64(file);
-      }
-
-      const response = await fetch("/api/tickets/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Bulk failed");
-        return;
-      }
-
-      const drafts = (data.previews || []).map(
-        (p: { draft: TicketDraft }) => p.draft,
-      ) as TicketDraft[];
-      setBulkDrafts(drafts);
-      setBulkSummaries(
-        (data.previews || []).map(
-          (p: { summary: string; confidence: number; projectKey: string }) =>
-            `${p.summary} · ${p.projectKey} · ${Math.round(p.confidence * 100)}%`,
-        ),
+      if (!response.ok) throw new Error(data.error || "Create failed");
+      const count = data.results?.length || 0;
+      setMessage(
+        `${count} ticket(s) created as you in ${data.company?.name || "Jira"}`,
       );
-      setDraft(drafts[0] || null);
-      setPreview(data.previews?.[0]?.markdown || "");
-      setLastResult(`Drafted ${data.draftCount} ticket(s) from ${data.sheetName}`);
-      setStep(4);
-    } catch {
-      setLastResult("Bulk request failed");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Create failed");
     } finally {
       setBusy(false);
     }
   }
 
-  async function onFileChange(fileList: FileList | null) {
-    if (!fileList?.length) return;
-    const selected = Array.from(fileList);
-    const spreadsheet = selected.find((f) =>
-      /\.(xlsx|xls|csv)$/i.test(f.name),
-    );
-
-    if (
-      spreadsheet &&
-      (task === "bulk" ||
-        playbookId === "bulk-rows" ||
-        playbookId === "field-trip-by-engagement" ||
-        playbookId === "configurator-design-sections")
-    ) {
-      await runBulk(spreadsheet);
-      return;
-    }
-
-    const texts: string[] = [];
-    for (const file of selected) {
-      const content = await file.text();
-      texts.push(`FILE: ${file.name}\n${content}`);
-    }
-    setFiles((prev) => [...prev, ...texts].slice(-8));
-    setLastResult(`Attached ${selected.length} note file(s).`);
-  }
-
-  async function addCompany() {
-    if (!newCompanyName.trim()) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/companies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCompanyName.trim(), activate: true }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setLastResult(data.error || "Could not add company");
-        return;
-      }
-      setNewCompanyName("");
-      setShowAddAccount(false);
-      await refreshCompanies(data.company.id);
-      await refreshAuth(data.company.id);
-      applyCompanyWorkflowDefaults(data.company);
-      setLastResult(`Added account ${data.company.name}`);
-      setStep(1);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function goTo(next: WizardStep) {
-    setStep(next);
-  }
-
-  function chooseTask(next: TaskId) {
-    setTask(next);
-    if (next === "bulk") {
-      const bulkPlaybook =
-        (activeCompany?.playbooks.find((p) =>
-          ["field-trip-by-engagement", "bulk-rows", "configurator-design-sections"].includes(
-            p.id,
-          ),
-        )?.id as PlaybookId | undefined) || "bulk-rows";
-      setPlaybookId(bulkPlaybook);
-    } else if (next === "brief" || next === "update" || next === "paste") {
-      setPlaybookId("single-brief");
-    }
-  }
-
-  function startAnotherTask() {
-    setDraft(null);
-    setBulkDrafts([]);
-    setBulkSummaries([]);
-    setPreview("");
-    setResearch(null);
-    setFiles([]);
-    setEditKey("");
-    setAvailableTransitions([]);
-    setCurrentStatus("");
-    setTransitionConfirm(false);
-    goTo(2);
-  }
-
-  function startCreate() {
-    chooseTask("brief");
-    goTo(3);
-  }
+  const audienceHelp =
+    AUDIENCE_OPTIONS.find((o) => o.id === audience)?.help || "";
 
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="topbar-brand">
-          <span className="topbar-mark" aria-hidden>
-            T
-          </span>
+      <aside className="sidebar">
+        <div className="brand">
           <strong>Ticket Flow</strong>
+          <span>Write tickets like you — with real context</span>
         </div>
-        <button type="button" className="btn-create" onClick={() => startCreate()}>
-          Create
-        </button>
-        <nav className="topbar-nav" aria-label="Primary">
-          {TASKS.slice(0, 4).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-active={task === item.id && step >= 2}
-              onClick={() => {
-                chooseTask(item.id);
-                goTo(3);
-              }}
-            >
-              {item.title}
-            </button>
-          ))}
-        </nav>
-        <div className="topbar-end">
-          <div className="user-chip" aria-live="polite">
-            {signedIn ? (
-              <>
-                <span className="dot ok" />
-                {authStatus?.connection?.oauthAccountName || "Signed in"}
-              </>
-            ) : (
-              <>
-                <span className="dot" />
-                Not signed in
-              </>
-            )}
-          </div>
-        </div>
-      </header>
 
-      <div className="body">
-        <aside className="sidebar">
-          <div className="workspace-label">
-            <small>Working in</small>
-            <strong>{activeCompany?.name || "Select account"}</strong>
-          </div>
-
-          <div className="nav-section">
-            <h3>Tasks</h3>
-            {TASKS.map((item) => (
+        <div>
+          <p className="side-label">Company accounts</p>
+          <div className="account-list">
+            {companies.map((company) => (
               <button
-                key={item.id}
+                key={company.id}
                 type="button"
-                className="nav-item"
-                data-active={task === item.id && step >= 2}
-                onClick={() => {
-                  chooseTask(item.id);
-                  goTo(step >= 3 ? 3 : 2);
-                }}
+                className="account"
+                data-active={company.id === activeCompanyId}
+                disabled={busy}
+                onClick={() => void switchCompany(company.id)}
               >
-                <span className="ico" aria-hidden>
-                  {item.icon}
+                <span
+                  className="avatar"
+                  style={{ background: colorFor(company.slug) }}
+                >
+                  {initials(company.name)}
                 </span>
-                {item.title}
+                <span className="account-copy">
+                  <strong>{company.name}</strong>
+                  <span>
+                    {company.connection.baseUrl ||
+                      company.connection.oauthSiteName ||
+                      "Add Jira URL"}
+                  </span>
+                </span>
               </button>
             ))}
           </div>
+        </div>
 
-          <div className="sidebar-spacer" />
+        <div className="add-box">
+          <p className="side-label" style={{ margin: 0 }}>
+            Add account
+          </p>
+          <input
+            placeholder="Company name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <input
+            placeholder="https://company.atlassian.net"
+            value={newJiraUrl}
+            onChange={(e) => setNewJiraUrl(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn secondary"
+            disabled={busy || !newName.trim()}
+            onClick={() => void addCompany()}
+          >
+            Add
+          </button>
+        </div>
+      </aside>
 
-          <div className="accounts">
-            <div className="accounts-head">
-              <h3>Accounts</h3>
+      <main className="main">
+        {message ? (
+          <div
+            className={`toast ${/fail|could not|error/i.test(message) ? "error" : "ok"}`}
+          >
+            {message}
+          </div>
+        ) : null}
+
+        <section className="hero">
+          <h1>
+            Drop the guidance.
+            <br />
+            I’ll write the tickets like you would.
+          </h1>
+          <p>
+            I search existing Jira + Confluence (and use your Figma/docs links) so
+            new tickets match the wording, format, and context of what’s already
+            there — then create them as you.
+          </p>
+        </section>
+
+        <div className="session-row">
+          <div className="who">
+            {signedIn
+              ? `Signed in as ${authStatus?.connection?.oauthAccountName || "you"}`
+              : "Not signed in yet — needed for live research + create"}
+          </div>
+          <div className="actions" style={{ margin: 0 }}>
+            {!signedIn ? (
               <button
                 type="button"
-                onClick={() => setShowAddAccount((v) => !v)}
+                className="btn primary"
+                disabled={busy || !authStatus?.oauthAppConfigured}
+                onClick={() => startSignIn()}
               >
-                {showAddAccount ? "Close" : "+ Add"}
+                Sign in to Jira
               </button>
-            </div>
-            <div className="account-list">
-              {companies.map((company) => (
-                <button
-                  key={company.id}
-                  type="button"
-                  className="account"
-                  data-active={activeCompanyId === company.id}
-                  disabled={busy}
-                  onClick={() => void switchCompany(company.id)}
-                >
-                  <span
-                    className="avatar"
-                    style={{ background: companyColor(company.slug) }}
-                    aria-hidden
-                  >
-                    {companyInitials(company.name)}
-                  </span>
-                  <span className="account-copy">
-                    <strong>{company.name}</strong>
-                    <span>
-                      {company.boards.map((b) => b.projectKey).join(" · ") ||
-                        company.slug}
-                    </span>
-                  </span>
-                  <span className="account-check" aria-hidden>
-                    ✓
-                  </span>
-                </button>
-              ))}
-            </div>
-            {showAddAccount && (
-              <div className="add-account">
-                <input
-                  value={newCompanyName}
-                  onChange={(e) => setNewCompanyName(e.target.value)}
-                  placeholder="New company name"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void addCompany();
-                  }}
-                />
-                <div className="add-account-actions">
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    disabled={busy || !newCompanyName.trim()}
-                    onClick={() => void addCompany()}
-                  >
-                    Add account
-                  </button>
-                </div>
-              </div>
-            )}
+            ) : null}
+            {jiraUrl ? (
+              <a className="btn ghost" href={jiraUrl} target="_blank" rel="noreferrer">
+                Open Jira
+              </a>
+            ) : null}
           </div>
-        </aside>
+        </div>
 
-        <main className="main">
-          <div className="toast ok" role="note">
-            Recommended: use the Chrome agent while logged into Jira — load unpacked
-            folder <code>ba-jira-assistant/chrome-extension</code>. See{" "}
-            <code>docs/CHROME_AGENT.md</code>. This website stays for bulk / OAuth
-            experiments.
+        <section className="card">
+          <div className="grid-2">
+            <label className="field">
+              <span>Jira URL for {activeCompany?.name || "this account"}</span>
+              <input
+                value={jiraUrlDraft}
+                onChange={(e) => setJiraUrlDraft(e.target.value)}
+                placeholder="https://christies.atlassian.net"
+              />
+            </label>
+            <label className="field">
+              <span>Who are the tickets for?</span>
+              <select
+                value={audience}
+                onChange={(e) => setAudience(e.target.value as TicketAudience)}
+              >
+                {AUDIENCE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="hint">{audienceHelp}</p>
+            </label>
           </div>
-          {lastResult ? (
-            <div
-              className={`toast ${/fail|wrong|could not|error/i.test(lastResult) ? "error" : "ok"}`}
-              role="status"
+          <div className="actions">
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={busy || !jiraUrlDraft.trim()}
+              onClick={() => void saveJiraUrl()}
             >
-              {lastResult}
-            </div>
-          ) : null}
-
-          <div className={`board ${step === 4 && draft ? "" : "solo"}`}>
-            <section className="panel">
-              <div className="panel-head">
-                <p className="crumbs">
-                  <strong>{activeCompany?.name || "Account"}</strong>
-                  {" / "}
-                  {selectedTask.title}
-                </p>
-                <h1>
-                  {step === 1 && "Sign in to Jira"}
-                  {step === 2 && "Choose a task"}
-                  {step === 3 && selectedTask.title}
-                  {step === 4 && (draft?.summary || "Review draft")}
-                </h1>
-                <p>
-                  {step === 1 &&
-                    "Connect Microsoft via Atlassian so tickets are created as you — for this account only."}
-                  {step === 2 &&
-                    "One job at a time. Switch company anytime from Accounts on the left."}
-                  {step === 3 && selectedTask.description}
-                  {step === 4 &&
-                    "Check the draft, then create, update, or copy."}
-                </p>
-              </div>
-
-              <nav className="stepper" aria-label="Progress">
-                {([1, 2, 3, 4] as WizardStep[]).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    data-active={step === item}
-                    data-done={step > item}
-                    onClick={() => {
-                      if (item <= step || (item === 4 && hasReview)) goTo(item);
-                    }}
-                  >
-                    {item}. {stepLabel(item)}
-                  </button>
-                ))}
-              </nav>
-
-              <div className="panel-body">
-                {step === 1 && (
-                  <div className="stack">
-                    <div className="group">
-                      <div className="row" style={{ cursor: "default" }}>
-                        <span className="row-copy">
-                          <strong>
-                            {signedIn
-                              ? "Connected"
-                              : authStatus?.oauthAppConfigured
-                                ? "Ready to connect"
-                                : "OAuth not configured"}
-                          </strong>
-                          <span>
-                            {signedIn
-                              ? authStatus?.connection?.oauthSiteName ||
-                                `Acting in ${activeCompany?.name || "this account"}`
-                              : authStatus?.oauthAppConfigured
-                                ? `Sign in for ${activeCompany?.name || "this account"}, then pick Microsoft`
-                                : "Add ATLASSIAN_CLIENT_ID and SECRET, then restart"}
-                          </span>
-                        </span>
-                        <span className="status-pill">
-                          {signedIn ? "Live" : "Idle"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="actions">
-                      {signedIn ? (
-                        <>
-                          <button
-                            type="button"
-                            className="btn secondary"
-                            disabled={busy}
-                            onClick={() => void signOut()}
-                          >
-                            Sign out
-                          </button>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            onClick={() => goTo(2)}
-                          >
-                            Continue
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="btn linkish"
-                            onClick={() => {
-                              chooseTask("paste");
-                              goTo(2);
-                            }}
-                          >
-                            Skip · copy/paste
-                          </button>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            disabled={busy || !authStatus?.oauthAppConfigured}
-                            onClick={() => startSignIn()}
-                          >
-                            Sign in with Microsoft
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="stack">
-                    <div className="group">
-                      {TASKS.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className="row"
-                          data-selected={task === item.id}
-                          onClick={() => chooseTask(item.id)}
-                        >
-                          <span className="row-copy">
-                            <strong>
-                              {item.icon} {item.title}
-                            </strong>
-                            <span>{item.description}</span>
-                            <em>{item.hint}</em>
-                          </span>
-                          <span className="chev" aria-hidden>
-                            ›
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="actions spread">
-                      <button
-                        type="button"
-                        className="btn linkish"
-                        onClick={() => goTo(1)}
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        className="btn primary"
-                        onClick={() => goTo(3)}
-                      >
-                        Continue
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {step === 3 && (
-                  <>
-                    {(task === "brief" || task === "update" || task === "paste") && (
-                      <div className="stack">
-                        {task === "update" && (
-                          <label className="field">
-                            <span>Issue key</span>
-                            <input
-                              value={editKey}
-                              onChange={(e) =>
-                                setEditKey(e.target.value.toUpperCase())
-                              }
-                              placeholder="WEB-123"
-                            />
-                          </label>
-                        )}
-                        <label className="field">
-                          <span>Brief</span>
-                          <textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            rows={7}
-                            placeholder="What should happen, for whom, and how we’ll know it’s done?"
-                          />
-                        </label>
-                        <div className="dropzone">
-                          Drop notes here, or choose files
-                          <input
-                            type="file"
-                            multiple
-                            accept=".txt,.md,.csv"
-                            onChange={(e) => void onFileChange(e.target.files)}
-                          />
-                        </div>
-                        {files.length > 0 && (
-                          <p className="muted">{files.length} note file(s) attached</p>
-                        )}
-                        {(task === "brief" || task === "update") && signedIn && (
-                          <div className="field-row">
-                            <label className="check">
-                              <input
-                                type="checkbox"
-                                checked={moveAfterCreate}
-                                onChange={(e) =>
-                                  setMoveAfterCreate(e.target.checked)
-                                }
-                              />
-                              After create, move to
-                            </label>
-                            <label className="field">
-                              <span>Status</span>
-                              <select
-                                value={postCreateStatus}
-                                disabled={!moveAfterCreate}
-                                onChange={(e) =>
-                                  setPostCreateStatus(e.target.value)
-                                }
-                              >
-                                {(
-                                  activeCompany?.workflow.commonStatuses || [
-                                    "In Analysis",
-                                    "To Do",
-                                    "In Progress",
-                                  ]
-                                ).map((status) => (
-                                  <option key={status} value={status}>
-                                    {status}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                        )}
-                        <div className="actions spread">
-                          <button
-                            type="button"
-                            className="btn linkish"
-                            onClick={() => goTo(2)}
-                          >
-                            Back
-                          </button>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            disabled={busy || !input.trim()}
-                            onClick={() => void sendBrief()}
-                          >
-                            {busy ? "Working…" : "Draft ticket"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {task === "bulk" && (
-                      <div className="stack">
-                        <label className="field">
-                          <span>Playbook</span>
-                          <select
-                            value={playbookId}
-                            disabled={busy || !activeCompany}
-                            onChange={(e) =>
-                              setPlaybookId(e.target.value as PlaybookId)
-                            }
-                          >
-                            {(activeCompany?.playbooks || []).map((playbook) => (
-                              <option key={playbook.id} value={playbook.id}>
-                                {playbook.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <p className="muted">
-                          {
-                            activeCompany?.playbooks.find(
-                              (p) => p.id === playbookId,
-                            )?.description
-                          }
-                        </p>
-                        {signedIn && (
-                          <div className="field-row">
-                            <label className="check">
-                              <input
-                                type="checkbox"
-                                checked={moveAfterCreate}
-                                onChange={(e) =>
-                                  setMoveAfterCreate(e.target.checked)
-                                }
-                              />
-                              After create, move to
-                            </label>
-                            <label className="field">
-                              <span>Status</span>
-                              <select
-                                value={postCreateStatus}
-                                disabled={!moveAfterCreate}
-                                onChange={(e) =>
-                                  setPostCreateStatus(e.target.value)
-                                }
-                              >
-                                {(
-                                  activeCompany?.workflow.commonStatuses || [
-                                    "In Analysis",
-                                  ]
-                                ).map((status) => (
-                                  <option key={status} value={status}>
-                                    {status}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                        )}
-                        <div className="dropzone">
-                          Upload Excel or CSV for {activeCompany?.name}
-                          <input
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            onChange={(e) => void onFileChange(e.target.files)}
-                          />
-                        </div>
-                        {playbookId === "configurator-design-sections" && (
-                          <div className="actions">
-                            <button
-                              type="button"
-                              className="btn primary"
-                              disabled={busy}
-                              onClick={() => void runBulk()}
-                            >
-                              Draft from knowledge
-                            </button>
-                          </div>
-                        )}
-                        <div className="actions spread">
-                          <button
-                            type="button"
-                            className="btn linkish"
-                            onClick={() => goTo(2)}
-                          >
-                            Back
-                          </button>
-                          <span className="hint">Upload to draft, then review</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {task === "move" && (
-                      <div className="stack">
-                        <label className="field">
-                          <span>Issue key</span>
-                          <input
-                            value={transitionKey}
-                            onChange={(e) =>
-                              setTransitionKey(e.target.value.toUpperCase())
-                            }
-                            placeholder="FIELD-45"
-                          />
-                        </label>
-                        <div className="actions">
-                          <button
-                            type="button"
-                            className="btn primary"
-                            disabled={
-                              busy || !transitionKey.trim() || !signedIn
-                            }
-                            onClick={() => void loadTransitions()}
-                          >
-                            Show allowed moves
-                          </button>
-                        </div>
-                        {(availableTransitions.length > 0 || currentStatus) && (
-                          <>
-                            <div className="group">
-                              <div className="row" style={{ cursor: "default" }}>
-                                <span className="row-copy">
-                                  <strong>Current status</strong>
-                                  <span>{currentStatus || "Unknown"}</span>
-                                </span>
-                                <span className="status-pill">
-                                  {currentStatus || "—"}
-                                </span>
-                              </div>
-                            </div>
-                            <label className="field">
-                              <span>Target</span>
-                              <select
-                                value={targetStatusShortcut}
-                                onChange={(e) =>
-                                  setTargetStatusShortcut(e.target.value)
-                                }
-                              >
-                                {(activeCompany?.workflow.commonStatuses || []).map(
-                                  (status) => (
-                                    <option key={status} value={status}>
-                                      {status}
-                                    </option>
-                                  ),
-                                )}
-                              </select>
-                            </label>
-                            <label className="field">
-                              <span>Allowed transition</span>
-                              <select
-                                value={selectedTransitionId}
-                                onChange={(e) =>
-                                  setSelectedTransitionId(e.target.value)
-                                }
-                              >
-                                {availableTransitions.map((transition) => (
-                                  <option key={transition.id} value={transition.id}>
-                                    {transition.name} → {transition.toStatus}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <div className="actions">
-                              <button
-                                type="button"
-                                className="btn secondary"
-                                disabled={busy || !signedIn}
-                                onClick={() => void applyTransition(false)}
-                              >
-                                Preview
-                              </button>
-                            </div>
-                            <label className="check">
-                              <input
-                                type="checkbox"
-                                checked={transitionConfirm}
-                                onChange={(e) =>
-                                  setTransitionConfirm(e.target.checked)
-                                }
-                              />
-                              Confirm move for {transitionKey}
-                            </label>
-                            <div className="actions">
-                              <button
-                                type="button"
-                                className="btn primary"
-                                disabled={
-                                  busy ||
-                                  !signedIn ||
-                                  !transitionConfirm ||
-                                  !selectedTransitionId
-                                }
-                                onClick={() => void applyTransition(true)}
-                              >
-                                Move ticket
-                              </button>
-                            </div>
-                          </>
-                        )}
-                        <div className="actions spread">
-                          <button
-                            type="button"
-                            className="btn linkish"
-                            onClick={() => goTo(2)}
-                          >
-                            Back
-                          </button>
-                          {!signedIn && (
-                            <span className="hint">Sign in to move status</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {step === 4 && (
-                  <div className="stack">
-                    {draft && (
-                      <>
-                        <div className="sheet-preview">
-                          <pre>{preview || "No preview yet."}</pre>
-                        </div>
-                        <div className="actions">
-                          {(task === "brief" || task === "bulk") && (
-                            <button
-                              type="button"
-                              className="btn primary"
-                              disabled={
-                                busy ||
-                                !signedIn ||
-                                (task === "bulk" && !bulkDrafts.length)
-                              }
-                              onClick={() =>
-                                void (
-                                  task === "bulk"
-                                    ? createBulkDrafts()
-                                    : createTicket()
-                                )
-                              }
-                            >
-                              {busy
-                                ? "Working…"
-                                : task === "bulk"
-                                  ? `Create ${bulkDrafts.length}`
-                                  : "Create in Jira"}
-                            </button>
-                          )}
-                          {task === "update" && (
-                            <button
-                              type="button"
-                              className="btn primary"
-                              disabled={busy || !signedIn || !editKey.trim()}
-                              onClick={() => void updateTicket()}
-                            >
-                              {busy ? "Working…" : `Update ${editKey || "issue"}`}
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="btn secondary"
-                            disabled={!draft}
-                            onClick={() =>
-                              draft &&
-                              void copyText(
-                                "summary",
-                                draftSummaryForPaste(draft),
-                              )
-                            }
-                          >
-                            Copy summary
-                          </button>
-                          <button
-                            type="button"
-                            className="btn secondary"
-                            disabled={!draft}
-                            onClick={() =>
-                              draft &&
-                              void copyText(
-                                "description",
-                                draftDescriptionForPaste(draft),
-                              )
-                            }
-                          >
-                            Copy description
-                          </button>
-                          {bulkDrafts.length > 0 && (
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={() => downloadBulkPack()}
-                            >
-                              Download pack
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                    <div className="actions spread">
-                      <button
-                        type="button"
-                        className="btn linkish"
-                        onClick={() => goTo(3)}
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        className="btn primary"
-                        onClick={() => startAnotherTask()}
-                      >
-                        Start another
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {step === 4 && draft && (
-              <aside className="side-panel">
-                <div className="side-block">
-                  <h4>Details</h4>
-                  <div className="detail-row">
-                    <span>Account</span>
-                    <strong>{activeCompany?.name}</strong>
-                  </div>
-                  <div className="detail-row">
-                    <span>Project</span>
-                    <strong>{draft.projectKey}</strong>
-                  </div>
-                  <div className="detail-row">
-                    <span>Status</span>
-                    <strong>
-                      <span className="status-pill">
-                        {moveAfterCreate ? postCreateStatus || "Draft" : "Draft"}
-                      </span>
-                    </strong>
-                  </div>
-                  <div className="detail-row">
-                    <span>Ready</span>
-                    <strong>
-                      {draft.confidence
-                        ? `${Math.round(draft.confidence * 100)}%`
-                        : "—"}
-                    </strong>
-                  </div>
-                  {draft.missingFields?.length ? (
-                    <div className="detail-row">
-                      <span>Gaps</span>
-                      <strong>{draft.missingFields.join(", ")}</strong>
-                    </div>
-                  ) : null}
-                </div>
-
-                {research &&
-                  (research.jiraHits.length > 0 ||
-                    research.confluenceHits.length > 0) && (
-                    <div className="side-block">
-                      <h4>Research</h4>
-                      <ul>
-                        {research.jiraHits.slice(0, 4).map((hit) => (
-                          <li key={hit.id}>
-                            <strong>{hit.id}</strong> — {hit.title}
-                          </li>
-                        ))}
-                        {research.confluenceHits.slice(0, 3).map((hit) => (
-                          <li key={`c-${hit.id}`}>Confluence — {hit.title}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                {bulkSummaries.length > 0 && (
-                  <div className="side-block">
-                    <h4>Queue · {bulkSummaries.length}</h4>
-                    <ul>
-                      {bulkSummaries.slice(0, 8).map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {messages.slice(-1).map((message) => (
-                  <div className="side-block" key={message.id}>
-                    <h4>Note</h4>
-                    <ul>
-                      <li>{message.content}</li>
-                    </ul>
-                  </div>
-                ))}
-              </aside>
-            )}
+              Save Jira URL
+            </button>
           </div>
-        </main>
-      </div>
+        </section>
+
+        <section className="card">
+          <label className="field">
+            <span>Guidance</span>
+            <textarea
+              value={guidance}
+              onChange={(e) => setGuidance(e.target.value)}
+              placeholder="Paste the brief, meeting notes, or “take this document and turn it into tickets”. Speak naturally — I’ll write in the same voice."
+            />
+          </label>
+          <label className="field">
+            <span>Links (Figma, Confluence, docs — one per line)</span>
+            <textarea
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+              rows={3}
+              placeholder={"https://www.figma.com/file/...\nhttps://…atlassian.net/wiki/..."}
+              style={{ minHeight: "5.5rem" }}
+            />
+          </label>
+          <label className="field">
+            <span>Files / screenshots</span>
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.csv,.pdf,image/*"
+              onChange={(e) => void onFiles(e.target.files)}
+            />
+            {files.length ? (
+              <p className="hint">{files.length} file(s) attached to this guidance</p>
+            ) : (
+              <p className="hint">
+                Screenshots, exports, and notes help me match existing tools and
+                wording.
+              </p>
+            )}
+          </label>
+          <div className="actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={busy || !guidance.trim()}
+              onClick={() => void researchAndDraft()}
+            >
+              {busy ? "Working…" : "Research & draft tickets"}
+            </button>
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={busy || !previews.length || !signedIn}
+              onClick={() => void createAll()}
+            >
+              Create in Jira as me
+            </button>
+          </div>
+          <p className="hint">
+            Prefer living in Chrome? Load unpacked{" "}
+            <code>ba-jira-assistant/chrome-extension</code> — same idea, uses the
+            tab you’re already logged into. See <code>docs/CHROME_AGENT.md</code>.
+          </p>
+        </section>
+
+        {previews.length > 0 && (
+          <section className="card">
+            <div className="session-row" style={{ marginBottom: "0.25rem" }}>
+              <h2 style={{ margin: 0, fontSize: "1.2rem" }}>
+                Draft tickets · {previews.length}
+              </h2>
+              {research ? (
+                <span className="pill">
+                  Context {research.jiraHits.length} Jira ·{" "}
+                  {research.confluenceHits.length} Confluence
+                </span>
+              ) : null}
+            </div>
+            {previews.map((preview) => (
+              <article key={`${preview.summary}-${preview.intent}`} className="ticket">
+                <div className="session-row" style={{ margin: 0 }}>
+                  <h3>{preview.summary}</h3>
+                  <span className="pill">{preview.intent}</span>
+                </div>
+                <div className="meta">
+                  {preview.projectKey} · {Math.round(preview.confidence * 100)}%
+                  ready
+                </div>
+                <pre>{preview.markdown}</pre>
+              </article>
+            ))}
+          </section>
+        )}
+      </main>
     </div>
   );
 }

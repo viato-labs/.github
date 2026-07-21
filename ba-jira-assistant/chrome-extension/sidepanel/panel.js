@@ -1,17 +1,19 @@
-import { runAgentTurn } from "../lib/agent.js";
 import { initials } from "../lib/accounts.js";
-import { toolHelp } from "../lib/tools.js";
 
-const chatEl = document.getElementById("chat");
-const inputEl = document.getElementById("input");
 const accountListEl = document.getElementById("account-list");
-const sessionLineEl = document.getElementById("session-line");
+const sessionEl = document.getElementById("session");
+const outEl = document.getElementById("out");
+const jiraUrlEl = document.getElementById("jira-url");
+const guidanceEl = document.getElementById("guidance");
+const linksEl = document.getElementById("links");
+const audienceEl = document.getElementById("audience");
+const createBtn = document.getElementById("btn-create");
 const addForm = document.getElementById("add-form");
 
 const state = {
   accounts: [],
   activeAccountId: null,
-  draft: null,
+  drafts: [],
   busy: false,
 };
 
@@ -19,12 +21,11 @@ function activeAccount() {
   return state.accounts.find((a) => a.id === state.activeAccountId) || null;
 }
 
-function pushBubble(role, text) {
+function push(text, className = "bubble") {
   const div = document.createElement("div");
-  div.className = `bubble ${role}`;
+  div.className = className;
   div.textContent = text;
-  chatEl.appendChild(div);
-  chatEl.scrollTop = chatEl.scrollHeight;
+  outEl.prepend(div);
 }
 
 function sendRuntime(message) {
@@ -39,15 +40,41 @@ function sendRuntime(message) {
   });
 }
 
+async function executeTool(name, params = {}) {
+  const response = await sendRuntime({
+    type: "TF_EXECUTE_TOOL",
+    name,
+    params,
+    session: {
+      activeAccountId: state.activeAccountId,
+      drafts: state.drafts,
+    },
+  });
+  if (!response?.ok) throw new Error(response?.error || "Tool failed");
+  if (response.data?.drafts) state.drafts = response.data.drafts;
+  if (response.data?.accounts) {
+    state.accounts = response.data.accounts;
+    state.activeAccountId = response.data.activeAccountId;
+    renderAccounts();
+  }
+  if (response.data?.account?.id) {
+    state.activeAccountId = response.data.account.id;
+  }
+  createBtn.disabled = !state.drafts.length;
+  return response.data;
+}
+
 async function refreshAccounts() {
   const response = await sendRuntime({ type: "TF_LOAD_ACCOUNTS" });
   if (!response?.ok) {
-    sessionLineEl.textContent = response?.error || "Could not load accounts";
+    sessionEl.textContent = response?.error || "Could not load accounts";
     return;
   }
   state.accounts = response.data.accounts;
   state.activeAccountId = response.data.activeAccountId;
   renderAccounts();
+  const account = activeAccount();
+  jiraUrlEl.value = account?.jiraUrl || "";
 }
 
 function renderAccounts() {
@@ -62,136 +89,127 @@ function renderAccounts() {
     )}</span><span>${account.name}</span>`;
     btn.addEventListener("click", async () => {
       const result = await executeTool("switch_account", { account: account.id });
-      pushBubble("assistant", result.message);
+      jiraUrlEl.value = result.account?.jiraUrl || "";
+      push(result.message);
       await refreshAccounts();
     });
     accountListEl.appendChild(btn);
   }
 }
 
-async function executeTool(name, params = {}) {
-  const response = await sendRuntime({
-    type: "TF_EXECUTE_TOOL",
-    name,
-    params,
-    session: {
-      activeAccountId: state.activeAccountId,
-      draft: state.draft,
-    },
-  });
-  if (!response?.ok) throw new Error(response?.error || "Tool failed");
-  if (response.data?.draft) state.draft = response.data.draft;
-  if (response.data?.account?.id) state.activeAccountId = response.data.account.id;
-  if (response.data?.accounts) {
-    state.accounts = response.data.accounts;
-    state.activeAccountId = response.data.activeAccountId || state.activeAccountId;
-    renderAccounts();
-  }
-  if (response.data?.pastePack) {
-    try {
-      await navigator.clipboard.writeText(response.data.pastePack);
-      response.data.message = `${response.data.message}\n(Copied to clipboard)`;
-    } catch {
-      /* ignore */
-    }
-  }
-  return response.data;
+function linkList() {
+  return linksEl.value
+    .split(/\n|,/)
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
-async function handleSend(text) {
-  if (!text || state.busy) return;
-  state.busy = true;
-  pushBubble("user", text);
-  inputEl.value = "";
+function renderDrafts(drafts) {
+  for (const draft of drafts.slice().reverse()) {
+    const card = document.createElement("article");
+    card.className = "ticket";
+    card.innerHTML = `<strong>${draft.summary}</strong><pre></pre>`;
+    card.querySelector("pre").textContent = draft.description;
+    outEl.prepend(card);
+  }
+}
+
+document.getElementById("btn-open").addEventListener("click", async () => {
   try {
-    const result = await runAgentTurn({
-      text,
-      context: {
-        account: activeAccount(),
-        draft: state.draft,
-      },
-      executeTool,
-    });
-    if (result.draft) state.draft = result.draft;
-    if (result.pastePack) {
-      try {
-        await navigator.clipboard.writeText(result.pastePack);
-        pushBubble("assistant", `${result.reply}\n(Copied to clipboard)`);
-      } catch {
-        pushBubble("assistant", result.reply);
-      }
-    } else {
-      pushBubble("assistant", result.reply);
-    }
-    await refreshAccounts();
+    push((await executeTool("open_jira")).message);
   } catch (error) {
-    pushBubble("assistant", error instanceof Error ? error.message : String(error));
-  } finally {
-    state.busy = false;
+    push(error.message);
   }
-}
-
-document.getElementById("composer").addEventListener("submit", (event) => {
-  event.preventDefault();
-  void handleSend(inputEl.value.trim());
 });
 
-document.getElementById("btn-tools").addEventListener("click", () => {
-  pushBubble("assistant", "Tools I can run in Chrome (no Cursor needed):\n" + toolHelp());
+document.getElementById("btn-save-url").addEventListener("click", async () => {
+  try {
+    const result = await executeTool("save_jira_url", {
+      accountId: state.activeAccountId,
+      jiraUrl: jiraUrlEl.value.trim(),
+    });
+    push(result.message);
+    await refreshAccounts();
+  } catch (error) {
+    push(error.message);
+  }
 });
 
 document.getElementById("btn-session").addEventListener("click", async () => {
   try {
     const result = await executeTool("detect_session");
-    sessionLineEl.textContent = result.message;
-    pushBubble("assistant", result.message);
+    sessionEl.textContent = result.message;
+    push(result.message);
     await refreshAccounts();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    sessionLineEl.textContent = message;
-    pushBubble("assistant", message);
+    sessionEl.textContent = error.message;
+    push(error.message);
   }
 });
 
-document.getElementById("btn-create").addEventListener("click", () => {
-  inputEl.focus();
-  inputEl.placeholder = "Paste your brief, then press Send…";
-  pushBubble(
-    "assistant",
-    `Creating for **${activeAccount()?.name || "current account"}**. Paste a short brief and I’ll draft it. Say create confirm when ready.`,
-  );
+document.getElementById("btn-draft").addEventListener("click", async () => {
+  if (state.busy) return;
+  state.busy = true;
+  try {
+    const result = await executeTool("draft_from_guidance", {
+      guidance: guidanceEl.value,
+      links: linkList(),
+      audience: audienceEl.value,
+    });
+    push(result.message);
+    renderDrafts(result.drafts || []);
+  } catch (error) {
+    push(error.message);
+  } finally {
+    state.busy = false;
+  }
 });
 
-document.getElementById("btn-add").addEventListener("click", () => {
+document.getElementById("btn-create").addEventListener("click", async () => {
+  if (state.busy || !state.drafts.length) return;
+  state.busy = true;
+  try {
+    const result = await executeTool("create_tickets", {
+      confirm: true,
+      drafts: state.drafts,
+    });
+    push(result.message);
+  } catch (error) {
+    push(error.message);
+  } finally {
+    state.busy = false;
+  }
+});
+
+document.getElementById("btn-add-toggle").addEventListener("click", () => {
   addForm.classList.toggle("hidden");
 });
 
 addForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const name = document.getElementById("add-name").value.trim();
-  const projectKey = document.getElementById("add-project").value.trim();
   try {
-    const result = await executeTool("add_account", { name, projectKey });
-    pushBubble("assistant", result.message);
+    const result = await executeTool("add_account", {
+      name: document.getElementById("add-name").value.trim(),
+      jiraUrl: document.getElementById("add-url").value.trim(),
+    });
+    push(result.message);
     addForm.reset();
     addForm.classList.add("hidden");
     await refreshAccounts();
   } catch (error) {
-    pushBubble("assistant", error instanceof Error ? error.message : String(error));
+    push(error.message);
   }
 });
 
-pushBubble(
-  "assistant",
-  "I’m a Chrome agent — not a Cursor plugin.\n\n1. Log into Christie's or McLaren Jira in this browser\n2. Pick the account on the left (or + Add)\n3. Paste a brief, or click Check login\n\nI create/search/move tickets using your existing session.",
+push(
+  "1. Pick a company\n2. Save its Jira URL + Open Jira (log in)\n3. Paste guidance / Figma / docs\n4. Choose Dev, QA, or both\n5. Research & draft → Create in Jira",
 );
 
 void refreshAccounts().then(async () => {
   try {
     const result = await executeTool("detect_session");
-    sessionLineEl.textContent = result.message;
+    sessionEl.textContent = result.message;
   } catch (error) {
-    sessionLineEl.textContent =
-      error instanceof Error ? error.message : "Open a logged-in Jira tab";
+    sessionEl.textContent = error.message;
   }
 });
