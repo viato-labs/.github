@@ -665,16 +665,15 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <div className="brand-mark" aria-hidden />
-          <div>
-            <p className="brand">Ticket Flow</p>
-            <p className="brand-sub">BA assistant for Jira</p>
-          </div>
+    <div className="shell">
+      <header className="ribbon">
+        <div className="ribbon-brand">
+          <strong>Ticket Flow</strong>
+          <span>
+            {activeCompany?.name || "BA workspace"}
+          </span>
         </div>
-        <div className="auth-chip" aria-live="polite">
+        <div className="ribbon-status" aria-live="polite">
           {signedIn ? (
             <>
               <span className="dot ok" />
@@ -689,35 +688,6 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero-band">
-        <p className="eyebrow">Simple path from brief → Jira</p>
-        <h1>Create authentic tickets without wrestling the UI.</h1>
-        <p className="lede">
-          Pick the company, sign in once, choose one task, then follow the steps.
-          No deletes. Updates and status moves only when you confirm.
-        </p>
-      </section>
-
-      <ol className="stepper" aria-label="Progress">
-        {([1, 2, 3, 4, 5] as WizardStep[]).map((item) => (
-          <li key={item}>
-            <button
-              type="button"
-              className={`step ${step === item ? "active" : ""} ${step > item ? "done" : ""}`}
-              onClick={() => {
-                if (item <= step || (item === 5 && hasReview)) goTo(item);
-                else if (item === 2 && activeCompanyId) goTo(2);
-                else if (item === 3 && activeCompanyId) goTo(3);
-                else if (item === 4 && activeCompanyId) goTo(4);
-              }}
-            >
-              <span className="step-index">{item}</span>
-              <span className="step-label">{stepLabel(item)}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-
       {lastResult ? (
         <div
           className={`toast ${/fail|wrong|could not|error/i.test(lastResult) ? "error" : "ok"}`}
@@ -727,92 +697,143 @@ export default function Home() {
         </div>
       ) : null}
 
-      {step === 1 && (
-        <section className="stage" key="step-1">
-          <div className="stage-head">
-            <p className="stage-kicker">Step 1</p>
-            <h2>Which company are you working in?</h2>
-            <p>Each company keeps its own Jira site, playbooks, and memory sealed.</p>
-          </div>
-          <div className="choice-grid">
-            {companies.map((company) => (
-              <button
-                key={company.id}
-                type="button"
-                className={`choice-card ${activeCompanyId === company.id ? "selected" : ""}`}
-                disabled={busy}
-                onClick={() => void switchCompany(company.id)}
-              >
-                <strong>{company.name}</strong>
-                <span>
-                  {company.boards.map((b) => b.projectKey).join(", ") || "No boards yet"}
-                </span>
-                <em>{company.playbooks.length} playbook(s)</em>
-              </button>
-            ))}
-          </div>
-          <div className="soft-panel">
-            <h3>Add another company</h3>
-            <div className="field-row">
-              <label className="field">
-                <span>Company name</span>
-                <input
-                  value={newCompanyName}
-                  onChange={(e) => setNewCompanyName(e.target.value)}
-                  placeholder="e.g. Acme Retail"
-                />
-              </label>
-              <div className="field" style={{ alignSelf: "end" }}>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={busy || !newCompanyName.trim()}
-                  onClick={() => void addCompany()}
-                >
-                  Add workspace
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="nav-row">
-            <span className="hint">Next: sign in with Microsoft via Atlassian.</span>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!activeCompanyId}
-              onClick={() => goTo(2)}
-            >
-              Continue
-            </button>
-          </div>
-        </section>
-      )}
-
-      {step === 2 && (
-        <section className="stage" key="step-2">
-          <div className="stage-head">
-            <p className="stage-kicker">Step 2</p>
-            <h2>Sign in so tickets are created as you</h2>
+      <main className="frame">
+        {step === 1 && (
+          <section className="hero" aria-label="Welcome">
+            <p className="hero-brand">Ticket Flow</p>
+            <h1>From brief to Jira, calmly.</h1>
             <p>
-              Use Atlassian OAuth, then choose Microsoft on their screen. This app
-              never sees your password.
+              One step at a time. Sign in as you, draft with research, then create —
+              without the clutter of the board.
             </p>
-          </div>
-          <div className="soft-panel auth-panel">
-            {signedIn ? (
-              <>
-                <p className="status-line ok">
-                  Connected
-                  {authStatus?.connection?.oauthSiteName
-                    ? ` to ${authStatus.connection.oauthSiteName}`
-                    : ""}
-                  .
-                </p>
-                <p className="muted">You’re ready to create, update, and move tickets.</p>
-                <div className="btn-row">
+          </section>
+        )}
+
+        <nav className="progress" aria-label="Progress">
+          {([1, 2, 3, 4, 5] as WizardStep[]).map((item, index) => (
+            <span key={item} style={{ display: "contents" }}>
+              {index > 0 ? <span className="progress-sep" aria-hidden /> : null}
+              <button
+                type="button"
+                data-active={step === item}
+                data-done={step > item}
+                onClick={() => {
+                  if (item <= step || (item === 5 && hasReview)) goTo(item);
+                  else if (item >= 2 && activeCompanyId) goTo(item as WizardStep);
+                }}
+              >
+                {stepLabel(item)}
+              </button>
+            </span>
+          ))}
+        </nav>
+
+        {step === 1 && (
+          <section className="stage" key="step-1">
+            <div className="stage-head">
+              <p className="kicker">Step 1</p>
+              <h2>Choose your company</h2>
+              <p>Each workspace keeps Jira, playbooks, and memory sealed.</p>
+            </div>
+
+            <div className="group">
+              {companies.map((company) => (
+                <button
+                  key={company.id}
+                  type="button"
+                  className="row"
+                  data-selected={activeCompanyId === company.id}
+                  disabled={busy}
+                  onClick={() => void switchCompany(company.id)}
+                >
+                  <span className="row-copy">
+                    <strong>{company.name}</strong>
+                    <span>
+                      {company.boards.map((b) => b.projectKey).join(" · ") ||
+                        "No boards yet"}
+                    </span>
+                  </span>
+                  <span className="check-mark" aria-hidden>
+                    ✓
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="stack" style={{ marginTop: "1.25rem" }}>
+              <label className="field">
+                <span>Add another company</span>
+                <div className="field-row">
+                  <input
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                    placeholder="Company name"
+                  />
                   <button
                     type="button"
-                    className="btn ghost"
+                    className="btn secondary"
+                    disabled={busy || !newCompanyName.trim()}
+                    onClick={() => void addCompany()}
+                  >
+                    Add
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div className="actions spread">
+              <span className="hint">Next: sign in with Microsoft</span>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={!activeCompanyId}
+                onClick={() => goTo(2)}
+              >
+                Continue
+              </button>
+            </div>
+          </section>
+        )}
+
+        {step === 2 && (
+          <section className="stage" key="step-2">
+            <div className="stage-head">
+              <p className="kicker">Step 2</p>
+              <h2>Sign in as yourself</h2>
+              <p>
+                Atlassian opens, then Microsoft SSO. Your password never enters this app.
+              </p>
+            </div>
+
+            <div className="group">
+              <div className="row" style={{ cursor: "default" }}>
+                <span className="row-copy">
+                  <strong>
+                    {signedIn
+                      ? "Connected"
+                      : authStatus?.oauthAppConfigured
+                        ? "Ready to connect"
+                        : "OAuth not configured"}
+                  </strong>
+                  <span>
+                    {signedIn
+                      ? authStatus?.connection?.oauthSiteName ||
+                        "Jira will create tickets as you"
+                      : authStatus?.oauthAppConfigured
+                        ? "Use Microsoft on the Atlassian screen"
+                        : "Add ATLASSIAN_CLIENT_ID and SECRET, then restart"}
+                  </span>
+                </span>
+                <span className={`status-pill`}>{signedIn ? "Live" : "Idle"}</span>
+              </div>
+            </div>
+
+            <div className="actions">
+              {signedIn ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn secondary"
                     disabled={busy}
                     onClick={() => void signOut()}
                   >
@@ -821,16 +842,19 @@ export default function Home() {
                   <button type="button" className="btn primary" onClick={() => goTo(3)}>
                     Choose a task
                   </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="muted">
-                  {authStatus?.oauthAppConfigured
-                    ? "Not signed in yet. You can still prepare a copy/paste pack."
-                    : "OAuth app not configured yet. Add ATLASSIAN_CLIENT_ID and ATLASSIAN_CLIENT_SECRET, then restart."}
-                </p>
-                <div className="btn-row">
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn linkish"
+                    onClick={() => {
+                      chooseTask("paste");
+                      goTo(3);
+                    }}
+                  >
+                    Skip · copy/paste
+                  </button>
                   <button
                     type="button"
                     className="btn primary"
@@ -839,459 +863,483 @@ export default function Home() {
                   >
                     Sign in with Microsoft
                   </button>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => {
-                      chooseTask("paste");
-                      goTo(3);
-                    }}
-                  >
-                    Skip for now (copy/paste)
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="nav-row">
-            <button type="button" className="btn ghost" onClick={() => goTo(1)}>
-              Back
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!signedIn && task !== "paste"}
-              onClick={() => goTo(3)}
-            >
-              Continue
-            </button>
-          </div>
-        </section>
-      )}
+                </>
+              )}
+            </div>
 
-      {step === 3 && (
-        <section className="stage" key="step-3">
-          <div className="stage-head">
-            <p className="stage-kicker">Step 3</p>
-            <h2>What do you want to do?</h2>
-            <p>One job at a time. Pick a task, then we’ll show only what you need.</p>
-          </div>
-          <div className="task-grid">
-            {TASKS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`task-card ${task === item.id ? "selected" : ""}`}
-                onClick={() => chooseTask(item.id)}
-              >
-                <strong>{item.title}</strong>
-                <span>{item.description}</span>
-                <em>{item.hint}</em>
+            <div className="actions spread">
+              <button type="button" className="btn linkish" onClick={() => goTo(1)}>
+                Back
               </button>
-            ))}
-          </div>
-          <div className="nav-row">
-            <button type="button" className="btn ghost" onClick={() => goTo(2)}>
-              Back
-            </button>
-            <button type="button" className="btn primary" onClick={() => goTo(4)}>
-              Continue to {selectedTask.title.toLowerCase()}
-            </button>
-          </div>
-        </section>
-      )}
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={!signedIn && task !== "paste"}
+                onClick={() => goTo(3)}
+              >
+                Continue
+              </button>
+            </div>
+          </section>
+        )}
 
-      {step === 4 && (
-        <section className="stage" key="step-4">
-          <div className="stage-head">
-            <p className="stage-kicker">Step 4 · {selectedTask.title}</p>
-            <h2>{selectedTask.description}</h2>
-            <p>{selectedTask.hint}</p>
-          </div>
+        {step === 3 && (
+          <section className="stage" key="step-3">
+            <div className="stage-head">
+              <p className="kicker">Step 3</p>
+              <h2>What do you need?</h2>
+              <p>Pick one job. We’ll hide everything else.</p>
+            </div>
 
-          {(task === "brief" || task === "update" || task === "paste") && (
-            <div className="work-form">
-              {task === "update" && (
+            <div className="group">
+              {TASKS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="row"
+                  data-selected={task === item.id}
+                  onClick={() => chooseTask(item.id)}
+                >
+                  <span className="row-copy">
+                    <strong>{item.title}</strong>
+                    <span>{item.description}</span>
+                    <em>{item.hint}</em>
+                  </span>
+                  <span className="chev" aria-hidden>
+                    ›
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="actions spread">
+              <button type="button" className="btn linkish" onClick={() => goTo(2)}>
+                Back
+              </button>
+              <button type="button" className="btn primary" onClick={() => goTo(4)}>
+                Continue
+              </button>
+            </div>
+          </section>
+        )}
+
+        {step === 4 && (
+          <section className="stage" key="step-4">
+            <div className="stage-head">
+              <p className="kicker">Step 4</p>
+              <h2>{selectedTask.title}</h2>
+              <p>{selectedTask.description}</p>
+            </div>
+
+            {(task === "brief" || task === "update" || task === "paste") && (
+              <div className="stack">
+                {task === "update" && (
+                  <label className="field">
+                    <span>Issue key</span>
+                    <input
+                      value={editKey}
+                      onChange={(e) => setEditKey(e.target.value.toUpperCase())}
+                      placeholder="WEB-123"
+                    />
+                  </label>
+                )}
                 <label className="field">
-                  <span>Existing Jira key to update</span>
-                  <input
-                    value={editKey}
-                    onChange={(e) => setEditKey(e.target.value.toUpperCase())}
-                    placeholder="e.g. WEB-123"
+                  <span>Brief</span>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    rows={7}
+                    placeholder="What should happen, for whom, and how we’ll know it’s done?"
                   />
                 </label>
-              )}
-              <label className="field">
-                <span>Your brief</span>
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  rows={7}
-                  placeholder="What needs to happen? Who is it for? Any constraints or AC you already know?"
-                />
-              </label>
-              <label className="field">
-                <span>Attach notes (optional)</span>
-                <input
-                  type="file"
-                  multiple
-                  accept=".txt,.md,.csv"
-                  onChange={(e) => void onFileChange(e.target.files)}
-                />
-              </label>
-              {files.length > 0 && (
-                <p className="muted">{files.length} note file(s) staged</p>
-              )}
-              {(task === "brief" || task === "update") && signedIn && (
-                <div className="field-row">
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={moveAfterCreate}
-                      onChange={(e) => setMoveAfterCreate(e.target.checked)}
-                    />
-                    After create, try moving to
-                  </label>
-                  <label className="field">
-                    <span>Status</span>
-                    <select
-                      value={postCreateStatus}
-                      disabled={!moveAfterCreate}
-                      onChange={(e) => setPostCreateStatus(e.target.value)}
-                    >
-                      {(
-                        activeCompany?.workflow.commonStatuses || [
-                          "In Analysis",
-                          "To Do",
-                          "In Progress",
-                        ]
-                      ).map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
-              <div className="nav-row">
-                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
-                  Back
-                </button>
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={busy || !input.trim()}
-                  onClick={() => void sendBrief()}
-                >
-                  {busy ? "Working…" : "Research & draft"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {task === "bulk" && (
-            <div className="work-form">
-              <label className="field">
-                <span>Playbook</span>
-                <select
-                  value={playbookId}
-                  disabled={busy || !activeCompany}
-                  onChange={(e) => setPlaybookId(e.target.value as PlaybookId)}
-                >
-                  {(activeCompany?.playbooks || []).map((playbook) => (
-                    <option key={playbook.id} value={playbook.id}>
-                      {playbook.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="muted">
-                {activeCompany?.playbooks.find((p) => p.id === playbookId)?.description}
-              </p>
-              {signedIn && (
-                <div className="field-row">
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={moveAfterCreate}
-                      onChange={(e) => setMoveAfterCreate(e.target.checked)}
-                    />
-                    After create, try moving to
-                  </label>
-                  <label className="field">
-                    <span>Status</span>
-                    <select
-                      value={postCreateStatus}
-                      disabled={!moveAfterCreate}
-                      onChange={(e) => setPostCreateStatus(e.target.value)}
-                    >
-                      {(activeCompany?.workflow.commonStatuses || ["In Analysis"]).map(
-                        (status) => (
+                <label className="field">
+                  <span>Notes (optional)</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".txt,.md,.csv"
+                    onChange={(e) => void onFileChange(e.target.files)}
+                  />
+                </label>
+                {files.length > 0 && (
+                  <p className="muted">{files.length} note file(s) attached</p>
+                )}
+                {(task === "brief" || task === "update") && signedIn && (
+                  <div className="field-row">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={moveAfterCreate}
+                        onChange={(e) => setMoveAfterCreate(e.target.checked)}
+                      />
+                      After create, move to
+                    </label>
+                    <label className="field">
+                      <span>Status</span>
+                      <select
+                        value={postCreateStatus}
+                        disabled={!moveAfterCreate}
+                        onChange={(e) => setPostCreateStatus(e.target.value)}
+                      >
+                        {(
+                          activeCompany?.workflow.commonStatuses || [
+                            "In Analysis",
+                            "To Do",
+                            "In Progress",
+                          ]
+                        ).map((status) => (
                           <option key={status} value={status}>
                             {status}
                           </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+                <div className="actions spread">
+                  <button type="button" className="btn linkish" onClick={() => goTo(3)}>
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !input.trim()}
+                    onClick={() => void sendBrief()}
+                  >
+                    {busy ? "Working…" : "Draft ticket"}
+                  </button>
                 </div>
-              )}
-              <label className="field">
-                <span>Upload Excel or CSV</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={(e) => void onFileChange(e.target.files)}
-                />
-              </label>
-              {playbookId === "configurator-design-sections" && (
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={() => void runBulk()}
-                >
-                  Draft design tickets from knowledge
-                </button>
-              )}
-              <div className="nav-row">
-                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
-                  Back
-                </button>
-                <span className="hint">
-                  Upload drafts tickets first. You’ll create them on the next step.
-                </span>
               </div>
-            </div>
-          )}
+            )}
 
-          {task === "move" && (
-            <div className="work-form">
-              <label className="field">
-                <span>Jira issue key</span>
-                <input
-                  value={transitionKey}
-                  onChange={(e) => setTransitionKey(e.target.value.toUpperCase())}
-                  placeholder="e.g. FIELD-45"
-                />
-              </label>
-              <div className="btn-row">
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={busy || !transitionKey.trim() || !signedIn}
-                  onClick={() => void loadTransitions()}
-                >
-                  Show allowed moves
-                </button>
-              </div>
-              {(availableTransitions.length > 0 || currentStatus) && (
-                <>
-                  <p className="muted">Current status: {currentStatus || "unknown"}</p>
-                  <label className="field">
-                    <span>Target status shortcut</span>
-                    <select
-                      value={targetStatusShortcut}
-                      onChange={(e) => setTargetStatusShortcut(e.target.value)}
-                    >
-                      {(activeCompany?.workflow.commonStatuses || []).map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Allowed transition</span>
-                    <select
-                      value={selectedTransitionId}
-                      onChange={(e) => setSelectedTransitionId(e.target.value)}
-                    >
-                      {availableTransitions.map((transition) => (
-                        <option key={transition.id} value={transition.id}>
-                          {transition.name} → {transition.toStatus}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="btn-row">
+            {task === "bulk" && (
+              <div className="stack">
+                <label className="field">
+                  <span>Playbook</span>
+                  <select
+                    value={playbookId}
+                    disabled={busy || !activeCompany}
+                    onChange={(e) => setPlaybookId(e.target.value as PlaybookId)}
+                  >
+                    {(activeCompany?.playbooks || []).map((playbook) => (
+                      <option key={playbook.id} value={playbook.id}>
+                        {playbook.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="muted">
+                  {
+                    activeCompany?.playbooks.find((p) => p.id === playbookId)
+                      ?.description
+                  }
+                </p>
+                {signedIn && (
+                  <div className="field-row">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={moveAfterCreate}
+                        onChange={(e) => setMoveAfterCreate(e.target.checked)}
+                      />
+                      After create, move to
+                    </label>
+                    <label className="field">
+                      <span>Status</span>
+                      <select
+                        value={postCreateStatus}
+                        disabled={!moveAfterCreate}
+                        onChange={(e) => setPostCreateStatus(e.target.value)}
+                      >
+                        {(
+                          activeCompany?.workflow.commonStatuses || ["In Analysis"]
+                        ).map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+                <label className="field">
+                  <span>Excel or CSV</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => void onFileChange(e.target.files)}
+                  />
+                </label>
+                {playbookId === "configurator-design-sections" && (
+                  <div className="actions">
                     <button
                       type="button"
-                      className="btn ghost"
-                      disabled={busy || !signedIn}
-                      onClick={() => void applyTransition(false)}
+                      className="btn primary"
+                      disabled={busy}
+                      onClick={() => void runBulk()}
                     >
-                      Preview move
+                      Draft from knowledge
                     </button>
                   </div>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={transitionConfirm}
-                      onChange={(e) => setTransitionConfirm(e.target.checked)}
-                    />
-                    I confirm this status move for {transitionKey}
-                  </label>
+                )}
+                <div className="actions spread">
+                  <button type="button" className="btn linkish" onClick={() => goTo(3)}>
+                    Back
+                  </button>
+                  <span className="hint">Upload to draft, then review</span>
+                </div>
+              </div>
+            )}
+
+            {task === "move" && (
+              <div className="stack">
+                <label className="field">
+                  <span>Issue key</span>
+                  <input
+                    value={transitionKey}
+                    onChange={(e) => setTransitionKey(e.target.value.toUpperCase())}
+                    placeholder="FIELD-45"
+                  />
+                </label>
+                <div className="actions">
                   <button
                     type="button"
                     className="btn primary"
-                    disabled={
-                      busy || !signedIn || !transitionConfirm || !selectedTransitionId
-                    }
-                    onClick={() => void applyTransition(true)}
+                    disabled={busy || !transitionKey.trim() || !signedIn}
+                    onClick={() => void loadTransitions()}
                   >
-                    Move ticket
+                    Show allowed moves
                   </button>
-                </>
-              )}
-              <div className="nav-row">
-                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
-                  Back
-                </button>
-                {!signedIn && (
-                  <span className="hint">Sign in first to move ticket status.</span>
+                </div>
+                {(availableTransitions.length > 0 || currentStatus) && (
+                  <>
+                    <div className="group">
+                      <div className="row" style={{ cursor: "default" }}>
+                        <span className="row-copy">
+                          <strong>Current status</strong>
+                          <span>{currentStatus || "Unknown"}</span>
+                        </span>
+                        <span className="status-pill">{currentStatus || "—"}</span>
+                      </div>
+                    </div>
+                    <label className="field">
+                      <span>Target</span>
+                      <select
+                        value={targetStatusShortcut}
+                        onChange={(e) => setTargetStatusShortcut(e.target.value)}
+                      >
+                        {(activeCompany?.workflow.commonStatuses || []).map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Allowed transition</span>
+                      <select
+                        value={selectedTransitionId}
+                        onChange={(e) => setSelectedTransitionId(e.target.value)}
+                      >
+                        {availableTransitions.map((transition) => (
+                          <option key={transition.id} value={transition.id}>
+                            {transition.name} → {transition.toStatus}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        disabled={busy || !signedIn}
+                        onClick={() => void applyTransition(false)}
+                      >
+                        Preview
+                      </button>
+                    </div>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={transitionConfirm}
+                        onChange={(e) => setTransitionConfirm(e.target.checked)}
+                      />
+                      Confirm move for {transitionKey}
+                    </label>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={
+                          busy ||
+                          !signedIn ||
+                          !transitionConfirm ||
+                          !selectedTransitionId
+                        }
+                        onClick={() => void applyTransition(true)}
+                      >
+                        Move ticket
+                      </button>
+                    </div>
+                  </>
                 )}
+                <div className="actions spread">
+                  <button type="button" className="btn linkish" onClick={() => goTo(3)}>
+                    Back
+                  </button>
+                  {!signedIn && <span className="hint">Sign in to move status</span>}
+                </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {step === 5 && (
+          <section className="stage" key="step-5">
+            <div className="stage-head">
+              <p className="kicker">Step 5</p>
+              <h2>Review</h2>
+              <p>Read it once. Then create, update, or copy.</p>
             </div>
-          )}
-        </section>
-      )}
 
-      {step === 5 && (
-        <section className="stage" key="step-5">
-          <div className="stage-head">
-            <p className="stage-kicker">Step 5 · Review</p>
-            <h2>Check the result, then take the final action</h2>
-            <p>Create/update only when the draft looks right. Status moves stay confirm-gated.</p>
-          </div>
-
-          {draft && (
-            <article className="result-card">
-              <h3>{draft.summary}</h3>
-              <p className="meta">
-                {draft.projectKey}
-                {draft.confidence
-                  ? ` · ${Math.round(draft.confidence * 100)}% confidence`
-                  : ""}
-                {draft.missingFields?.length
-                  ? ` · Gaps: ${draft.missingFields.join(", ")}`
-                  : ""}
-              </p>
-              <pre className="body-preview">
-                {preview || "No preview yet."}
-              </pre>
-              <div className="btn-row">
-                {(task === "brief" || task === "bulk") && (
+            {draft && (
+              <article className="sheet">
+                <div className="sheet-top">
+                  <div>
+                    <h3>{draft.summary}</h3>
+                    <p className="meta">
+                      {draft.projectKey}
+                      {draft.confidence
+                        ? ` · ${Math.round(draft.confidence * 100)}% ready`
+                        : ""}
+                      {draft.missingFields?.length
+                        ? ` · Gaps: ${draft.missingFields.join(", ")}`
+                        : ""}
+                    </p>
+                  </div>
+                  <span className="status-pill">
+                    {moveAfterCreate ? postCreateStatus || "Draft" : "Draft"}
+                  </span>
+                </div>
+                <div className="sheet-body">
+                  <pre>{preview || "No preview yet."}</pre>
+                </div>
+                <div className="sheet-actions">
+                  {(task === "brief" || task === "bulk") && (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={
+                        busy ||
+                        !signedIn ||
+                        (task === "bulk" && !bulkDrafts.length)
+                      }
+                      onClick={() =>
+                        void (task === "bulk" ? createBulkDrafts() : createTicket())
+                      }
+                    >
+                      {busy
+                        ? "Working…"
+                        : task === "bulk"
+                          ? `Create ${bulkDrafts.length}`
+                          : "Create in Jira"}
+                    </button>
+                  )}
+                  {task === "update" && (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={busy || !signedIn || !editKey.trim()}
+                      onClick={() => void updateTicket()}
+                    >
+                      {busy ? "Working…" : `Update ${editKey || "issue"}`}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="btn primary"
-                    disabled={busy || !signedIn || (task === "bulk" && !bulkDrafts.length)}
+                    className="btn secondary"
+                    disabled={!draft}
                     onClick={() =>
-                      void (task === "bulk" ? createBulkDrafts() : createTicket())
+                      draft && void copyText("summary", draftSummaryForPaste(draft))
                     }
                   >
-                    {busy
-                      ? "Working…"
-                      : task === "bulk"
-                        ? `Create ${bulkDrafts.length} in Jira`
-                        : "Create in Jira as me"}
+                    Copy summary
                   </button>
-                )}
-                {task === "update" && (
                   <button
                     type="button"
-                    className="btn primary"
-                    disabled={busy || !signedIn || !editKey.trim()}
-                    onClick={() => void updateTicket()}
+                    className="btn secondary"
+                    disabled={!draft}
+                    onClick={() =>
+                      draft &&
+                      void copyText("description", draftDescriptionForPaste(draft))
+                    }
                   >
-                    {busy ? "Working…" : `Update ${editKey || "issue"} as me`}
+                    Copy description
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={!draft}
-                  onClick={() =>
-                    draft && void copyText("summary", draftSummaryForPaste(draft))
-                  }
-                >
-                  Copy summary
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={!draft}
-                  onClick={() =>
-                    draft &&
-                    void copyText("description", draftDescriptionForPaste(draft))
-                  }
-                >
-                  Copy description
-                </button>
-                {bulkDrafts.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => downloadBulkPack()}
-                  >
-                    Download paste pack
-                  </button>
-                )}
+                  {bulkDrafts.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => downloadBulkPack()}
+                    >
+                      Download pack
+                    </button>
+                  )}
+                </div>
+              </article>
+            )}
+
+            {research &&
+              (research.jiraHits.length > 0 || research.confluenceHits.length > 0) && (
+                <div className="side-note">
+                  <h4>Research</h4>
+                  <ul>
+                    {research.jiraHits.slice(0, 4).map((hit) => (
+                      <li key={hit.id}>
+                        <strong>{hit.id}</strong> — {hit.title}
+                      </li>
+                    ))}
+                    {research.confluenceHits.slice(0, 3).map((hit) => (
+                      <li key={`c-${hit.id}`}>
+                        <strong>Confluence</strong> — {hit.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            {bulkSummaries.length > 0 && (
+              <div className="side-note">
+                <h4>Queue · {bulkSummaries.length}</h4>
+                <ul>
+                  {bulkSummaries.slice(0, 12).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
               </div>
-            </article>
-          )}
+            )}
 
-          {research && (research.jiraHits.length > 0 || research.confluenceHits.length > 0) && (
-            <article className="result-card soft">
-              <h3>Research used</h3>
-              <ul className="research-list">
-                {research.jiraHits.slice(0, 5).map((hit) => (
-                  <li key={hit.id}>
-                    <strong>Jira</strong> · {hit.title}
-                    <span>{hit.id}</span>
-                  </li>
-                ))}
-                {research.confluenceHits.slice(0, 4).map((hit) => (
-                  <li key={`c-${hit.id}`}>
-                    <strong>Confluence</strong> · {hit.title}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          )}
-
-          {bulkSummaries.length > 0 && (
-            <article className="result-card">
-              <h3>Bulk queue ({bulkSummaries.length})</h3>
-              <ul className="bulk-list">
-                {bulkSummaries.slice(0, 20).map((line) => (
-                  <li key={line}>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          )}
-
-          {messages.slice(-3).map((message) => (
-            <article key={message.id} className="result-card soft">
-              <p className="muted" style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+            {messages.slice(-1).map((message) => (
+              <p key={message.id} className="quiet-block">
                 {message.content}
               </p>
-            </article>
-          ))}
+            ))}
 
-          <div className="nav-row">
-            <button type="button" className="btn ghost" onClick={() => goTo(4)}>
-              Back to work
-            </button>
-            <button type="button" className="btn primary" onClick={() => startAnotherTask()}>
-              Start another task
-            </button>
-          </div>
-        </section>
-      )}
-    </main>
+            <div className="actions spread">
+              <button type="button" className="btn linkish" onClick={() => goTo(4)}>
+                Back
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => startAnotherTask()}
+              >
+                Start another
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
   );
 }
