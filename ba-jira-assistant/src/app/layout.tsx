@@ -20,9 +20,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BA Jira Assistant",
+  title: "Ticket Flow · BA Jira Assistant",
   description:
-    "Chat-driven BA intake that drafts Christie's-style Jira tickets with Gherkin QA and Definition of Ready.",
+    "Step-by-step BA assistant that drafts authentic Jira tickets with research, playbooks, and safe status moves.",
 };
 
 export default function RootLayout({

@@ -31,6 +31,62 @@ type AuthStatus = {
   };
 };
 
+type WizardStep = 1 | 2 | 3 | 4 | 5;
+type TaskId = "brief" | "bulk" | "update" | "move" | "paste";
+
+const TASKS: Array<{
+  id: TaskId;
+  title: string;
+  description: string;
+  hint: string;
+}> = [
+  {
+    id: "brief",
+    title: "Write one ticket",
+    description: "Paste a short brief, research history, then create in Jira.",
+    hint: "Best for a single story or bug.",
+  },
+  {
+    id: "bulk",
+    title: "Bulk from Excel / CSV",
+    description: "Upload a sheet and draft many tickets with a company playbook.",
+    hint: "Christie’s engagement sheets → SCO tickets on BAU.",
+  },
+  {
+    id: "update",
+    title: "Update an existing ticket",
+    description: "Draft improvements, then update a Jira key as you.",
+    hint: "Never deletes. Only updates what you confirm.",
+  },
+  {
+    id: "move",
+    title: "Move ticket status",
+    description: "Preview allowed workflow transitions, then confirm the move.",
+    hint: "Christie’s often: In Analysis.",
+  },
+  {
+    id: "paste",
+    title: "Copy / paste pack",
+    description: "Generate text you can paste into Jira manually.",
+    hint: "Fallback if you’re not signed in yet.",
+  },
+];
+
+function stepLabel(step: WizardStep) {
+  switch (step) {
+    case 1:
+      return "Company";
+    case 2:
+      return "Sign in";
+    case 3:
+      return "Task";
+    case 4:
+      return "Work";
+    case 5:
+      return "Review";
+  }
+}
+
 function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -64,7 +120,6 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [lastResult, setLastResult] = useState("");
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [showCompanies, setShowCompanies] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [editKey, setEditKey] = useState("");
   const [research, setResearch] = useState<ResearchBundle | null>(null);
@@ -77,6 +132,9 @@ export default function Home() {
   const [currentStatus, setCurrentStatus] = useState("");
   const [selectedTransitionId, setSelectedTransitionId] = useState("");
   const [targetStatusShortcut, setTargetStatusShortcut] = useState("In Analysis");
+  const [step, setStep] = useState<WizardStep>(1);
+  const [task, setTask] = useState<TaskId>("brief");
+  const [transitionConfirm, setTransitionConfirm] = useState(false);
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
@@ -86,6 +144,9 @@ export default function Home() {
   const signedIn = Boolean(
     authStatus?.oauthConnected || authStatus?.connection?.oauthConnected,
   );
+
+  const selectedTask = TASKS.find((item) => item.id === task)!;
+  const hasReview = Boolean(draft || bulkDrafts.length || preview);
 
   function applyCompanyWorkflowDefaults(company?: CompanySummary | null) {
     if (!company?.workflow) return;
@@ -125,9 +186,11 @@ export default function Home() {
 
       if (oauth === "success") {
         setLastResult("Signed in with Microsoft/Atlassian — app can act as you in Jira");
+        setStep(3);
         window.history.replaceState({}, "", "/");
       } else if (oauth === "error") {
         setLastResult(params.get("message") || "OAuth sign-in failed");
+        setStep(2);
         window.history.replaceState({}, "", "/");
       }
 
@@ -138,7 +201,7 @@ export default function Home() {
           id: "welcome",
           role: "assistant",
           createdAt: new Date().toISOString(),
-          content: `Working in **${companyData.company.name}**. Path B: **Sign in with Microsoft**, then drafts search that company's Jira + Confluence and remember historical style/context so a new ticket (e.g. calendar) connects to how existing features work.`,
+          content: `Working in **${companyData.company.name}**. Sign in, pick a task, then follow the steps.`,
         },
       ]);
       setPlaybookId(
@@ -206,6 +269,7 @@ export default function Home() {
           content: `Switched to **${company?.name || companyId}**. Sign in with Microsoft for this company if you want the app to create/edit Jira as you there.`,
         },
       ]);
+      setLastResult(`Working in ${company?.name || companyId}`);
     } finally {
       setBusy(false);
     }
@@ -246,7 +310,6 @@ export default function Home() {
         createdAt: new Date().toISOString(),
       },
     ]);
-    setInput("");
 
     try {
       const response = await fetch("/api/chat", {
@@ -275,8 +338,8 @@ export default function Home() {
           id: uid(),
           role: "assistant",
           content: signedIn
-            ? `${data.reply}\n\nSigned in — researched Jira/Confluence, updated company memory, and you can create this ticket as you.`
-            : `${data.reply}\n\nNot signed in yet — Sign in with Microsoft to unlock live Jira/Confluence research, or copy/paste manually.`,
+            ? `${data.reply}\n\nSigned in — researched Jira/Confluence and ready to create as you.`
+            : `${data.reply}\n\nNot signed in — you can still copy/paste, or sign in to create in Jira.`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -291,16 +354,10 @@ export default function Home() {
           ).json()
         ).markdown || "",
       );
+      setLastResult("Draft ready — review, then create or copy.");
+      setStep(5);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: "Something went wrong while drafting. Try again.",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setLastResult("Something went wrong while drafting. Try again.");
     } finally {
       setBusy(false);
     }
@@ -331,17 +388,6 @@ export default function Home() {
       setLastResult(
         `${result.dryRun ? "Dry-run" : "Created"} ${result.key} as you in ${data.company.name}.${transitionNote}`,
       );
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: `${result.dryRun ? "Dry-run ticket" : "Created Jira issue"} **${result.key}** in ${data.company.name}.${
-            result.transition ? `\n${result.transition.message}` : ""
-          }`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
       if (result.key) setTransitionKey(result.key);
       setPreview(result.previewMarkdown || preview);
       await refreshCompanies(activeCompanyId);
@@ -371,15 +417,6 @@ export default function Home() {
         return;
       }
       setLastResult(`Updated ${data.result.key} as you`);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: `Updated Jira issue **${data.result.key}** using the current draft.`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
     } catch {
       setLastResult("Update request failed");
     } finally {
@@ -416,19 +453,6 @@ export default function Home() {
           moveAfterCreate ? ` · ${moved} moved toward ${postCreateStatus}` : ""
         }`,
       );
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: `Bulk ${dryRun ? "dry-run" : "create"} complete for **${data.company.name}**: ${createdCount} tickets${
-            moveAfterCreate
-              ? `, with post-create status targeting **${postCreateStatus}** where the workflow allows it.`
-              : "."
-          }`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
       await refreshCompanies(activeCompanyId);
     } catch {
       setLastResult("Bulk create failed");
@@ -452,8 +476,9 @@ export default function Home() {
       setAvailableTransitions(data.transitions || []);
       setCurrentStatus(data.currentStatus || "");
       setSelectedTransitionId(data.transitions?.[0]?.id || "");
+      setTransitionConfirm(false);
       setLastResult(
-        `${transitionKey.trim()} is in ${data.currentStatus || "unknown"}. ${data.transitions?.length || 0} transition(s) available.`,
+        `${transitionKey.trim()} is in ${data.currentStatus || "unknown"}. ${data.transitions?.length || 0} move(s) available.`,
       );
     } catch {
       setLastResult("Could not load transitions");
@@ -464,6 +489,10 @@ export default function Home() {
 
   async function applyTransition(confirm: boolean) {
     if (!transitionKey.trim() || !activeCompanyId || busy) return;
+    if (confirm && !transitionConfirm) {
+      setLastResult("Tick the confirmation box before moving the ticket.");
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetch("/api/tickets/transitions", {
@@ -484,17 +513,7 @@ export default function Home() {
       }
       setAvailableTransitions(data.result?.availableTransitions || []);
       setLastResult(data.result?.message || "Transition checked");
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: data.result?.message || "Transition checked",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
       if (confirm) {
-        // Refresh allowed transitions from the new status.
         const refresh = await fetch(
           `/api/tickets/transitions?issueKey=${encodeURIComponent(transitionKey.trim())}&companyId=${encodeURIComponent(activeCompanyId)}`,
         );
@@ -503,6 +522,7 @@ export default function Home() {
           setAvailableTransitions(refreshData.transitions || []);
           setCurrentStatus(refreshData.currentStatus || "");
           setSelectedTransitionId(refreshData.transitions?.[0]?.id || "");
+          setTransitionConfirm(false);
         }
       }
     } catch {
@@ -552,19 +572,7 @@ export default function Home() {
       setDraft(drafts[0] || null);
       setPreview(data.previews?.[0]?.markdown || "");
       setLastResult(`Drafted ${data.draftCount} ticket(s) from ${data.sheetName}`);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "assistant",
-          content: `Prepared **${data.draftCount}** drafts for **${data.company.name}**. ${
-            signedIn
-              ? "Create them in Jira as you, or download a paste pack."
-              : "Sign in with Microsoft to create them as you."
-          }`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setStep(5);
     } catch {
       setLastResult("Bulk request failed");
     } finally {
@@ -581,7 +589,8 @@ export default function Home() {
 
     if (
       spreadsheet &&
-      (playbookId === "bulk-rows" ||
+      (task === "bulk" ||
+        playbookId === "bulk-rows" ||
         playbookId === "field-trip-by-engagement" ||
         playbookId === "configurator-design-sections")
     ) {
@@ -595,6 +604,7 @@ export default function Home() {
       texts.push(`FILE: ${file.name}\n${content}`);
     }
     setFiles((prev) => [...prev, ...texts].slice(-8));
+    setLastResult(`Attached ${selected.length} note file(s).`);
   }
 
   async function addCompany() {
@@ -614,372 +624,674 @@ export default function Home() {
       setNewCompanyName("");
       await refreshCompanies(data.company.id);
       await refreshAuth(data.company.id);
+      applyCompanyWorkflowDefaults(data.company);
       setLastResult(`Added company ${data.company.name}`);
     } finally {
       setBusy(false);
     }
   }
 
-  const statusTone = signedIn ? "ok" : "warn";
+  function goTo(next: WizardStep) {
+    setStep(next);
+  }
+
+  function chooseTask(next: TaskId) {
+    setTask(next);
+    if (next === "bulk") {
+      const bulkPlaybook =
+        (activeCompany?.playbooks.find((p) =>
+          ["field-trip-by-engagement", "bulk-rows", "configurator-design-sections"].includes(
+            p.id,
+          ),
+        )?.id as PlaybookId | undefined) || "bulk-rows";
+      setPlaybookId(bulkPlaybook);
+    } else if (next === "brief" || next === "update" || next === "paste") {
+      setPlaybookId("single-brief");
+    }
+  }
+
+  function startAnotherTask() {
+    setDraft(null);
+    setBulkDrafts([]);
+    setBulkSummaries([]);
+    setPreview("");
+    setResearch(null);
+    setFiles([]);
+    setEditKey("");
+    setAvailableTransitions([]);
+    setCurrentStatus("");
+    setTransitionConfirm(false);
+    goTo(3);
+  }
 
   return (
-    <main className="app-shell">
-      <h1 className="brand">BA Jira Assistant</h1>
-      <p className="lede">
-        Path B: sign in with Microsoft through Atlassian, then this app creates and
-        edits Jira tickets as you — per company workspace.
-      </p>
+    <main className="shell">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden />
+          <div>
+            <p className="brand">Ticket Flow</p>
+            <p className="brand-sub">BA assistant for Jira</p>
+          </div>
+        </div>
+        <div className="auth-chip" aria-live="polite">
+          {signedIn ? (
+            <>
+              <span className="dot ok" />
+              {authStatus?.connection?.oauthAccountName || "Signed in"}
+            </>
+          ) : (
+            <>
+              <span className="dot" />
+              Not signed in
+            </>
+          )}
+        </div>
+      </header>
 
-      <div className="status-row">
-        <label className="chip">
-          Company{" "}
-          <select
-            value={activeCompanyId}
-            disabled={busy}
-            onChange={(e) => void switchCompany(e.target.value)}
-          >
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="chip">
-          Playbook{" "}
-          <select
-            value={playbookId}
-            disabled={busy || !activeCompany}
-            onChange={(e) => setPlaybookId(e.target.value as PlaybookId)}
-          >
-            {(activeCompany?.playbooks || []).map((playbook) => (
-              <option key={playbook.id} value={playbook.id}>
-                {playbook.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="chip" data-tone={statusTone}>
-          {authStatus?.message || "Checking Jira sign-in…"}
-        </span>
-        {draft ? (
-          <span className="chip">
-            Draft confidence {Math.round(draft.confidence * 100)}%
-          </span>
-        ) : null}
-        {lastResult ? <span className="chip">{lastResult}</span> : null}
-      </div>
-
-      <div className="actions" style={{ marginTop: "0.85rem" }}>
-        {!signedIn ? (
-          <button
-            className="primary"
-            disabled={busy || !authStatus?.oauthAppConfigured}
-            onClick={() => startSignIn()}
-          >
-            Sign in with Microsoft
-          </button>
-        ) : (
-          <button disabled={busy} onClick={() => void signOut()}>
-            Sign out of Jira for this company
-          </button>
-        )}
-        <button disabled={busy} onClick={() => setShowCompanies((v) => !v)}>
-          {showCompanies ? "Hide companies" : "Add company workspace"}
-        </button>
-        {playbookId === "configurator-design-sections" ? (
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => void runBulk()}
-          >
-            Draft design tickets from knowledge
-          </button>
-        ) : null}
-        {bulkDrafts.length ? (
-          <>
-            <button disabled={busy} onClick={() => downloadBulkPack()}>
-              Download paste pack
-            </button>
-            <button
-              className="primary"
-              disabled={busy || !signedIn}
-              onClick={() => void createBulkDrafts()}
-            >
-              Create all in Jira as me
-            </button>
-          </>
-        ) : null}
-      </div>
-
-      {!authStatus?.oauthAppConfigured ? (
-        <p className="hint" style={{ marginTop: "0.85rem" }}>
-          OAuth app not configured yet. Add <code>ATLASSIAN_CLIENT_ID</code> and{" "}
-          <code>ATLASSIAN_CLIENT_SECRET</code> from an Atlassian developer OAuth
-          2.0 (3LO) app. Callback URL:{" "}
-          <code>http://localhost:3000/api/auth/atlassian/callback</code>. See{" "}
-          <code>docs/CORPORATE_SSO.md</code>.
+      <section className="hero-band">
+        <p className="eyebrow">Simple path from brief → Jira</p>
+        <h1>Create authentic tickets without wrestling the UI.</h1>
+        <p className="lede">
+          Pick the company, sign in once, choose one task, then follow the steps.
+          No deletes. Updates and status moves only when you confirm.
         </p>
+      </section>
+
+      <ol className="stepper" aria-label="Progress">
+        {([1, 2, 3, 4, 5] as WizardStep[]).map((item) => (
+          <li key={item}>
+            <button
+              type="button"
+              className={`step ${step === item ? "active" : ""} ${step > item ? "done" : ""}`}
+              onClick={() => {
+                if (item <= step || (item === 5 && hasReview)) goTo(item);
+                else if (item === 2 && activeCompanyId) goTo(2);
+                else if (item === 3 && activeCompanyId) goTo(3);
+                else if (item === 4 && activeCompanyId) goTo(4);
+              }}
+            >
+              <span className="step-index">{item}</span>
+              <span className="step-label">{stepLabel(item)}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+
+      {lastResult ? (
+        <div
+          className={`toast ${/fail|wrong|could not|error/i.test(lastResult) ? "error" : "ok"}`}
+          role="status"
+        >
+          {lastResult}
+        </div>
       ) : null}
 
-      {showCompanies ? (
-        <section className="panel" style={{ marginTop: "1rem", minHeight: 0 }}>
-          <div className="panel-header">Company workspaces</div>
-          <div className="composer">
-            <p className="file-row">
-              Each company has its own knowledge + its own Microsoft/Atlassian
-              sign-in session.
-            </p>
-            <div className="file-row">
-              <input
-                placeholder="Add another company name"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-              />
-              <button disabled={busy} onClick={() => void addCompany()}>
-                Add company workspace
+      {step === 1 && (
+        <section className="stage" key="step-1">
+          <div className="stage-head">
+            <p className="stage-kicker">Step 1</p>
+            <h2>Which company are you working in?</h2>
+            <p>Each company keeps its own Jira site, playbooks, and memory sealed.</p>
+          </div>
+          <div className="choice-grid">
+            {companies.map((company) => (
+              <button
+                key={company.id}
+                type="button"
+                className={`choice-card ${activeCompanyId === company.id ? "selected" : ""}`}
+                disabled={busy}
+                onClick={() => void switchCompany(company.id)}
+              >
+                <strong>{company.name}</strong>
+                <span>
+                  {company.boards.map((b) => b.projectKey).join(", ") || "No boards yet"}
+                </span>
+                <em>{company.playbooks.length} playbook(s)</em>
               </button>
+            ))}
+          </div>
+          <div className="soft-panel">
+            <h3>Add another company</h3>
+            <div className="field-row">
+              <label className="field">
+                <span>Company name</span>
+                <input
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  placeholder="e.g. Acme Retail"
+                />
+              </label>
+              <div className="field" style={{ alignSelf: "end" }}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={busy || !newCompanyName.trim()}
+                  onClick={() => void addCompany()}
+                >
+                  Add workspace
+                </button>
+              </div>
             </div>
           </div>
+          <div className="nav-row">
+            <span className="hint">Next: sign in with Microsoft via Atlassian.</span>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!activeCompanyId}
+              onClick={() => goTo(2)}
+            >
+              Continue
+            </button>
+          </div>
         </section>
-      ) : null}
+      )}
 
-      <div className="workspace">
-        <section className="panel">
-          <div className="panel-header">Brief / bulk intake</div>
-          <div className="chat-log" aria-live="polite">
-            {messages.map((message) => (
-              <div key={message.id} className="bubble" data-role={message.role}>
-                {message.content}
-              </div>
+      {step === 2 && (
+        <section className="stage" key="step-2">
+          <div className="stage-head">
+            <p className="stage-kicker">Step 2</p>
+            <h2>Sign in so tickets are created as you</h2>
+            <p>
+              Use Atlassian OAuth, then choose Microsoft on their screen. This app
+              never sees your password.
+            </p>
+          </div>
+          <div className="soft-panel auth-panel">
+            {signedIn ? (
+              <>
+                <p className="status-line ok">
+                  Connected
+                  {authStatus?.connection?.oauthSiteName
+                    ? ` to ${authStatus.connection.oauthSiteName}`
+                    : ""}
+                  .
+                </p>
+                <p className="muted">You’re ready to create, update, and move tickets.</p>
+                <div className="btn-row">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={() => void signOut()}
+                  >
+                    Sign out
+                  </button>
+                  <button type="button" className="btn primary" onClick={() => goTo(3)}>
+                    Choose a task
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted">
+                  {authStatus?.oauthAppConfigured
+                    ? "Not signed in yet. You can still prepare a copy/paste pack."
+                    : "OAuth app not configured yet. Add ATLASSIAN_CLIENT_ID and ATLASSIAN_CLIENT_SECRET, then restart."}
+                </p>
+                <div className="btn-row">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !authStatus?.oauthAppConfigured}
+                    onClick={() => startSignIn()}
+                  >
+                    Sign in with Microsoft
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => {
+                      chooseTask("paste");
+                      goTo(3);
+                    }}
+                  >
+                    Skip for now (copy/paste)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="nav-row">
+            <button type="button" className="btn ghost" onClick={() => goTo(1)}>
+              Back
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!signedIn && task !== "paste"}
+              onClick={() => goTo(3)}
+            >
+              Continue
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 3 && (
+        <section className="stage" key="step-3">
+          <div className="stage-head">
+            <p className="stage-kicker">Step 3</p>
+            <h2>What do you want to do?</h2>
+            <p>One job at a time. Pick a task, then we’ll show only what you need.</p>
+          </div>
+          <div className="task-grid">
+            {TASKS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`task-card ${task === item.id ? "selected" : ""}`}
+                onClick={() => chooseTask(item.id)}
+              >
+                <strong>{item.title}</strong>
+                <span>{item.description}</span>
+                <em>{item.hint}</em>
+              </button>
             ))}
           </div>
-          <div className="composer">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Epic: Discovery. Buyers should…"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  void sendBrief();
-                }
-              }}
-            />
-            <div className="file-row">
-              <label>
-                Upload notes / Excel / CSV{" "}
+          <div className="nav-row">
+            <button type="button" className="btn ghost" onClick={() => goTo(2)}>
+              Back
+            </button>
+            <button type="button" className="btn primary" onClick={() => goTo(4)}>
+              Continue to {selectedTask.title.toLowerCase()}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 4 && (
+        <section className="stage" key="step-4">
+          <div className="stage-head">
+            <p className="stage-kicker">Step 4 · {selectedTask.title}</p>
+            <h2>{selectedTask.description}</h2>
+            <p>{selectedTask.hint}</p>
+          </div>
+
+          {(task === "brief" || task === "update" || task === "paste") && (
+            <div className="work-form">
+              {task === "update" && (
+                <label className="field">
+                  <span>Existing Jira key to update</span>
+                  <input
+                    value={editKey}
+                    onChange={(e) => setEditKey(e.target.value.toUpperCase())}
+                    placeholder="e.g. WEB-123"
+                  />
+                </label>
+              )}
+              <label className="field">
+                <span>Your brief</span>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  rows={7}
+                  placeholder="What needs to happen? Who is it for? Any constraints or AC you already know?"
+                />
+              </label>
+              <label className="field">
+                <span>Attach notes (optional)</span>
                 <input
                   type="file"
                   multiple
-                  accept=".xlsx,.xls,.csv,.txt,.md"
+                  accept=".txt,.md,.csv"
                   onChange={(e) => void onFileChange(e.target.files)}
                 />
               </label>
-              <span>
-                {files.length
-                  ? `${files.length} note file(s) staged`
-                  : "Spreadsheets auto-run the selected bulk playbook"}
-              </span>
+              {files.length > 0 && (
+                <p className="muted">{files.length} note file(s) staged</p>
+              )}
+              {(task === "brief" || task === "update") && signedIn && (
+                <div className="field-row">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={moveAfterCreate}
+                      onChange={(e) => setMoveAfterCreate(e.target.checked)}
+                    />
+                    After create, try moving to
+                  </label>
+                  <label className="field">
+                    <span>Status</span>
+                    <select
+                      value={postCreateStatus}
+                      disabled={!moveAfterCreate}
+                      onChange={(e) => setPostCreateStatus(e.target.value)}
+                    >
+                      {(
+                        activeCompany?.workflow.commonStatuses || [
+                          "In Analysis",
+                          "To Do",
+                          "In Progress",
+                        ]
+                      ).map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+              <div className="nav-row">
+                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy || !input.trim()}
+                  onClick={() => void sendBrief()}
+                >
+                  {busy ? "Working…" : "Research & draft"}
+                </button>
+              </div>
             </div>
-            <div className="file-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={moveAfterCreate}
-                  onChange={(e) => setMoveAfterCreate(e.target.checked)}
-                />{" "}
-                After create, move to
+          )}
+
+          {task === "bulk" && (
+            <div className="work-form">
+              <label className="field">
+                <span>Playbook</span>
+                <select
+                  value={playbookId}
+                  disabled={busy || !activeCompany}
+                  onChange={(e) => setPlaybookId(e.target.value as PlaybookId)}
+                >
+                  {(activeCompany?.playbooks || []).map((playbook) => (
+                    <option key={playbook.id} value={playbook.id}>
+                      {playbook.name}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={postCreateStatus}
-                disabled={!moveAfterCreate}
-                onChange={(e) => setPostCreateStatus(e.target.value)}
-              >
-                {(
-                  activeCompany?.workflow.commonStatuses || [
-                    "In Analysis",
-                    "To Do",
-                    "In Progress",
-                    "In Review",
-                  ]
-                ).map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="actions">
-              <button
-                className="primary"
-                disabled={busy || !input.trim()}
-                onClick={() => void sendBrief()}
-              >
-                Draft from brief
-              </button>
-              <button
-                className="primary"
-                disabled={busy || !draft || !signedIn}
-                onClick={() => void createTicket()}
-              >
-                Create in Jira as me
-              </button>
-              <button
-                disabled={!draft}
-                onClick={() =>
-                  draft && void copyText("summary", draftSummaryForPaste(draft))
-                }
-              >
-                Copy summary
-              </button>
-              <button
-                disabled={!draft}
-                onClick={() =>
-                  draft &&
-                  void copyText("description", draftDescriptionForPaste(draft))
-                }
-              >
-                Copy description
-              </button>
-            </div>
-            <div className="file-row">
-              <input
-                placeholder="Existing issue key to edit (e.g. WEB-123)"
-                value={editKey}
-                onChange={(e) => setEditKey(e.target.value)}
-              />
-              <button
-                disabled={busy || !draft || !editKey.trim() || !signedIn}
-                onClick={() => void updateTicket()}
-              >
-                Update issue as me
-              </button>
-            </div>
-            <div className="file-row">
-              <input
-                placeholder="Issue key for status change (e.g. FIELD-45)"
-                value={transitionKey}
-                onChange={(e) => setTransitionKey(e.target.value)}
-              />
-              <button
-                disabled={busy || !transitionKey.trim() || !signedIn}
-                onClick={() => void loadTransitions()}
-              >
-                Load allowed statuses
-              </button>
-            </div>
-            {availableTransitions.length || currentStatus ? (
-              <div className="file-row">
-                <span>Current: {currentStatus || "unknown"}</span>
-                <select
-                  value={targetStatusShortcut}
-                  onChange={(e) => setTargetStatusShortcut(e.target.value)}
-                >
-                  {(activeCompany?.workflow.commonStatuses || []).map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={selectedTransitionId}
-                  onChange={(e) => setSelectedTransitionId(e.target.value)}
-                >
-                  {availableTransitions.map((transition) => (
-                    <option key={transition.id} value={transition.id}>
-                      {transition.name} → {transition.toStatus}
-                    </option>
-                  ))}
-                </select>
+              <p className="muted">
+                {activeCompany?.playbooks.find((p) => p.id === playbookId)?.description}
+              </p>
+              {signedIn && (
+                <div className="field-row">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={moveAfterCreate}
+                      onChange={(e) => setMoveAfterCreate(e.target.checked)}
+                    />
+                    After create, try moving to
+                  </label>
+                  <label className="field">
+                    <span>Status</span>
+                    <select
+                      value={postCreateStatus}
+                      disabled={!moveAfterCreate}
+                      onChange={(e) => setPostCreateStatus(e.target.value)}
+                    >
+                      {(activeCompany?.workflow.commonStatuses || ["In Analysis"]).map(
+                        (status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                </div>
+              )}
+              <label className="field">
+                <span>Upload Excel or CSV</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => void onFileChange(e.target.files)}
+                />
+              </label>
+              {playbookId === "configurator-design-sections" && (
                 <button
-                  disabled={busy || !signedIn || !transitionKey.trim()}
-                  onClick={() => void applyTransition(false)}
+                  type="button"
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => void runBulk()}
                 >
-                  Preview move
+                  Draft design tickets from knowledge
                 </button>
+              )}
+              <div className="nav-row">
+                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
+                  Back
+                </button>
+                <span className="hint">
+                  Upload drafts tickets first. You’ll create them on the next step.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {task === "move" && (
+            <div className="work-form">
+              <label className="field">
+                <span>Jira issue key</span>
+                <input
+                  value={transitionKey}
+                  onChange={(e) => setTransitionKey(e.target.value.toUpperCase())}
+                  placeholder="e.g. FIELD-45"
+                />
+              </label>
+              <div className="btn-row">
                 <button
-                  className="primary"
-                  disabled={busy || !signedIn || !transitionKey.trim()}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `Move ${transitionKey.trim()} toward "${targetStatusShortcut}" using only a Jira-allowed transition?`,
-                      )
-                    ) {
-                      void applyTransition(true);
+                  type="button"
+                  className="btn primary"
+                  disabled={busy || !transitionKey.trim() || !signedIn}
+                  onClick={() => void loadTransitions()}
+                >
+                  Show allowed moves
+                </button>
+              </div>
+              {(availableTransitions.length > 0 || currentStatus) && (
+                <>
+                  <p className="muted">Current status: {currentStatus || "unknown"}</p>
+                  <label className="field">
+                    <span>Target status shortcut</span>
+                    <select
+                      value={targetStatusShortcut}
+                      onChange={(e) => setTargetStatusShortcut(e.target.value)}
+                    >
+                      {(activeCompany?.workflow.commonStatuses || []).map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Allowed transition</span>
+                    <select
+                      value={selectedTransitionId}
+                      onChange={(e) => setSelectedTransitionId(e.target.value)}
+                    >
+                      {availableTransitions.map((transition) => (
+                        <option key={transition.id} value={transition.id}>
+                          {transition.name} → {transition.toStatus}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="btn-row">
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={busy || !signedIn}
+                      onClick={() => void applyTransition(false)}
+                    >
+                      Preview move
+                    </button>
+                  </div>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={transitionConfirm}
+                      onChange={(e) => setTransitionConfirm(e.target.checked)}
+                    />
+                    I confirm this status move for {transitionKey}
+                  </label>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={
+                      busy || !signedIn || !transitionConfirm || !selectedTransitionId
                     }
-                  }}
-                >
-                  Confirm status change
+                    onClick={() => void applyTransition(true)}
+                  >
+                    Move ticket
+                  </button>
+                </>
+              )}
+              <div className="nav-row">
+                <button type="button" className="btn ghost" onClick={() => goTo(3)}>
+                  Back
                 </button>
+                {!signedIn && (
+                  <span className="hint">Sign in first to move ticket status.</span>
+                )}
               </div>
-            ) : null}
+            </div>
+          )}
+        </section>
+      )}
+
+      {step === 5 && (
+        <section className="stage" key="step-5">
+          <div className="stage-head">
+            <p className="stage-kicker">Step 5 · Review</p>
+            <h2>Check the result, then take the final action</h2>
+            <p>Create/update only when the draft looks right. Status moves stay confirm-gated.</p>
+          </div>
+
+          {draft && (
+            <article className="result-card">
+              <h3>{draft.summary}</h3>
+              <p className="meta">
+                {draft.projectKey}
+                {draft.confidence
+                  ? ` · ${Math.round(draft.confidence * 100)}% confidence`
+                  : ""}
+                {draft.missingFields?.length
+                  ? ` · Gaps: ${draft.missingFields.join(", ")}`
+                  : ""}
+              </p>
+              <pre className="body-preview">
+                {preview || "No preview yet."}
+              </pre>
+              <div className="btn-row">
+                {(task === "brief" || task === "bulk") && (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !signedIn || (task === "bulk" && !bulkDrafts.length)}
+                    onClick={() =>
+                      void (task === "bulk" ? createBulkDrafts() : createTicket())
+                    }
+                  >
+                    {busy
+                      ? "Working…"
+                      : task === "bulk"
+                        ? `Create ${bulkDrafts.length} in Jira`
+                        : "Create in Jira as me"}
+                  </button>
+                )}
+                {task === "update" && (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !signedIn || !editKey.trim()}
+                    onClick={() => void updateTicket()}
+                  >
+                    {busy ? "Working…" : `Update ${editKey || "issue"} as me`}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={!draft}
+                  onClick={() =>
+                    draft && void copyText("summary", draftSummaryForPaste(draft))
+                  }
+                >
+                  Copy summary
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={!draft}
+                  onClick={() =>
+                    draft &&
+                    void copyText("description", draftDescriptionForPaste(draft))
+                  }
+                >
+                  Copy description
+                </button>
+                {bulkDrafts.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => downloadBulkPack()}
+                  >
+                    Download paste pack
+                  </button>
+                )}
+              </div>
+            </article>
+          )}
+
+          {research && (research.jiraHits.length > 0 || research.confluenceHits.length > 0) && (
+            <article className="result-card soft">
+              <h3>Research used</h3>
+              <ul className="research-list">
+                {research.jiraHits.slice(0, 5).map((hit) => (
+                  <li key={hit.id}>
+                    <strong>Jira</strong> · {hit.title}
+                    <span>{hit.id}</span>
+                  </li>
+                ))}
+                {research.confluenceHits.slice(0, 4).map((hit) => (
+                  <li key={`c-${hit.id}`}>
+                    <strong>Confluence</strong> · {hit.title}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          )}
+
+          {bulkSummaries.length > 0 && (
+            <article className="result-card">
+              <h3>Bulk queue ({bulkSummaries.length})</h3>
+              <ul className="bulk-list">
+                {bulkSummaries.slice(0, 20).map((line) => (
+                  <li key={line}>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          )}
+
+          {messages.slice(-3).map((message) => (
+            <article key={message.id} className="result-card soft">
+              <p className="muted" style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                {message.content}
+              </p>
+            </article>
+          ))}
+
+          <div className="nav-row">
+            <button type="button" className="btn ghost" onClick={() => goTo(4)}>
+              Back to work
+            </button>
+            <button type="button" className="btn primary" onClick={() => startAnotherTask()}>
+              Start another task
+            </button>
           </div>
         </section>
-
-        <section className="panel">
-          <div className="panel-header">Preview / bulk queue</div>
-          <div className="side-meta">
-            <div>
-              {activeCompany
-                ? `${activeCompany.name} boards: ${activeCompany.boards
-                    .map((b) => b.projectKey)
-                    .join(", ")}`
-                : "Select a company"}
-            </div>
-            <div>
-              {activeCompany?.playbooks.find((p) => p.id === playbookId)
-                ?.description || "Choose a playbook"}
-            </div>
-            <div>
-              {signedIn
-                ? `Acting as ${authStatus?.connection?.oauthAccountName || "you"} on ${authStatus?.connection?.oauthSiteName || "Jira"}.`
-                : "Sign in with Microsoft to create/edit as you."}
-            </div>
-            {research ? (
-              <div>
-                Research: {research.jiraHits.length} Jira ·{" "}
-                {research.confluenceHits.length} Confluence
-                <ul>
-                  {research.jiraHits.slice(0, 4).map((hit) => (
-                    <li key={hit.id}>
-                      Jira {hit.id}: {hit.title}
-                    </li>
-                  ))}
-                  {research.confluenceHits.slice(0, 3).map((hit) => (
-                    <li key={`c-${hit.id}`}>Confluence: {hit.title}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {bulkSummaries.length ? (
-              <div>
-                Bulk queue ({bulkSummaries.length}):
-                <ul>
-                  {bulkSummaries.slice(0, 12).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : draft?.missingFields?.length ? (
-              <div>Gaps: {draft.missingFields.join(", ")}</div>
-            ) : (
-              <div>Gaps: none flagged</div>
-            )}
-          </div>
-          <div className="preview">
-            <pre>{preview || "Draft a brief or upload a spreadsheet to preview."}</pre>
-          </div>
-        </section>
-      </div>
-
-      <p className="hint">
-        Sign-in opens Atlassian consent, then your company Microsoft login/MFA.
-        Tokens are stored per company under <code>.data/workspaces/</code> and
-        never ask for your password in this app. Setup:{" "}
-        <code>docs/CORPORATE_SSO.md</code>.
-      </p>
+      )}
     </main>
   );
 }
