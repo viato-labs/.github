@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Ticket Flow Agent",
+  "description": "AI BA agent for Jira that uses your logged-in Chrome session. Switch Christie's / McLaren accounts and run ticket tools without Cursor.",
+  "version": "0.2.0",
+  "action": {
+    "default_title": "Ticket Flow Agent",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.atlassian.net/*",
+    "https://*.jira.com/*",
+    "https://jira.task.mclaren.com/*",
+    "https://christiestech.atlassian.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.atlassian.net/*",
+        "https://*.jira.com/*",
+        "https://jira.task.mclaren.com/*",
+        "https://christiestech.atlassian.net/*"
+      ],
+      "js": ["content/jira-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
