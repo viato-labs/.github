@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { CompanySummary, ResearchBundle, TicketDraft } from "@/lib/types";
 import type { TicketAudience } from "@/lib/guidance/draft";
+import { draftToMarkdown } from "@/lib/templates/ticket-body";
+import {
+  bulkPackMarkdown,
+  draftDescriptionForPaste,
+  draftSummaryForPaste,
+} from "@/lib/export/clipboard";
 
 type AuthStatus = {
   message: string;
@@ -132,6 +138,42 @@ export default function Home() {
   const [jiraUrlDraft, setJiraUrlDraft] = useState("");
   const [newName, setNewName] = useState("");
   const [newJiraUrl, setNewJiraUrl] = useState("");
+  const [refinePrompt, setRefinePrompt] = useState("");
+  const [refineTarget, setRefineTarget] = useState<"all" | number>("all");
+  const [chatLog, setChatLog] = useState<Array<{ role: "you" | "ai"; text: string }>>(
+    [],
+  );
+
+  function setDraftsFromPreviews(next: Preview[]) {
+    setPreviews(next);
+  }
+
+  function updateDraft(index: number, patch: Partial<TicketDraft>) {
+    setPreviews((current) =>
+      current.map((preview, i) => {
+        if (i !== index) return preview;
+        const draft = { ...preview.draft, ...patch };
+        return {
+          ...preview,
+          summary: draft.summary,
+          projectKey: draft.projectKey,
+          intent: draft.intent,
+          confidence: draft.confidence,
+          markdown: draftToMarkdown(draft),
+          draft,
+        };
+      }),
+    );
+  }
+
+  async function copyText(label: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage(`Copied ${label} to clipboard`);
+    } catch {
+      setMessage(`Could not copy ${label} — select the text manually`);
+    }
+  }
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === activeCompanyId) || null,
@@ -209,6 +251,8 @@ export default function Home() {
       );
       setPreviews([]);
       setResearch(null);
+      setChatLog([]);
+      setRefinePrompt("");
       setStage("idle");
       await refreshAuth(companyId);
       setMessage(`Entered ${selected?.name || "account"}`);
@@ -314,6 +358,8 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error || "Draft failed");
       setPreviews(data.previews || []);
       setResearch(data.research || null);
+      setChatLog([]);
+      setRefineTarget("all");
       setStage("drafted");
       setMessage(
         `Drafted ${data.previews?.length || 0} ticket(s) for ${data.company.name}${
@@ -330,8 +376,55 @@ export default function Home() {
     }
   }
 
-  async function createAll() {
+  async function refineWithChat() {
+    if (!refinePrompt.trim() || !previews.length) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/guidance/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          message: refinePrompt.trim(),
+          drafts: previews.map((p) => p.draft),
+          targetIndex: refineTarget === "all" ? null : refineTarget,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Refine failed");
+      setDraftsFromPreviews(data.previews || []);
+      setChatLog((log) => {
+        const next: Array<{ role: "you" | "ai"; text: string }> = [
+          { role: "you", text: refinePrompt.trim() },
+          { role: "ai", text: data.reply || "Updated." },
+          ...log,
+        ];
+        return next.slice(0, 12);
+      });
+      setRefinePrompt("");
+      setStage("drafted");
+      setMessage(data.reply || "Drafts updated from your note");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Refine failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createDrafts(which: "all" | number) {
     if (!previews.length || !signedIn) return;
+    const selected =
+      which === "all" ? previews : [previews[which]].filter(Boolean);
+    if (!selected.length) return;
+    const label =
+      which === "all"
+        ? `${selected.length} ticket(s)`
+        : `ticket ${which + 1}`;
+    const confirmed = window.confirm(
+      `Create ${label} in ${activeCompany?.name || "Jira"} as you?`,
+    );
+    if (!confirmed) return;
+
     setBusy(true);
     setStage("creating");
     try {
@@ -340,15 +433,19 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId: activeCompanyId,
-          drafts: previews.map((p) => p.draft),
+          drafts: selected.map((p) => p.draft),
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Create failed");
-      const count = data.results?.length || 0;
+      const keys = (data.results || [])
+        .map((r: { key?: string }) => r.key)
+        .filter(Boolean);
       setStage("drafted");
       setMessage(
-        `${count} ticket(s) created as you in ${data.company?.name || "Jira"}`,
+        keys.length
+          ? `Created ${keys.join(", ")} as you in ${data.company?.name || "Jira"}`
+          : `${data.results?.length || 0} ticket(s) created as you`,
       );
     } catch (error) {
       setStage("drafted");
@@ -664,38 +761,38 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="actions end">
-              <button
-                type="button"
-                className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
-                disabled={busy || !previews.length || !signedIn}
-                onClick={() => void createAll()}
-              >
-                <Icon
-                  name={
-                    busy && stage === "creating" ? "progress_activity" : "publish"
-                  }
-                />
-                Create in Jira
-              </button>
-              <button
-                type="button"
-                className={`btn primary ${busy && stage === "researching" ? "busy" : ""}`}
-                disabled={busy || !guidance.trim()}
-                onClick={() => void researchAndDraft()}
-              >
-                <Icon
-                  name={
-                    busy && stage === "researching"
-                      ? "progress_activity"
-                      : "travel_explore"
-                  }
-                />
-                {busy && stage === "researching"
-                  ? "Researching…"
-                  : "Research & draft"}
-              </button>
-            </div>
+              <div className="actions end">
+                <button
+                  type="button"
+                  className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
+                  disabled={busy || !previews.length || !signedIn}
+                  onClick={() => void createDrafts("all")}
+                >
+                  <Icon
+                    name={
+                      busy && stage === "creating" ? "progress_activity" : "publish"
+                    }
+                  />
+                  Create all in Jira
+                </button>
+                <button
+                  type="button"
+                  className={`btn primary ${busy && stage === "researching" ? "busy" : ""}`}
+                  disabled={busy || !guidance.trim()}
+                  onClick={() => void researchAndDraft()}
+                >
+                  <Icon
+                    name={
+                      busy && stage === "researching"
+                        ? "progress_activity"
+                        : "travel_explore"
+                    }
+                  />
+                  {busy && stage === "researching"
+                    ? "Researching…"
+                    : "Research & draft"}
+                </button>
+              </div>
           </section>
 
           {hasActivity && research ? (
@@ -738,7 +835,7 @@ export default function Home() {
           <div className="card-head">
             <h2 className="card-title">
               <Icon name="stacks" />
-              3 · Draft tickets
+              3 · Review & revise
               {previews.length ? ` · ${previews.length}` : ""}
             </h2>
             {research ? (
@@ -751,36 +848,196 @@ export default function Home() {
           </div>
 
           {previews.length > 0 ? (
-            <div className="ticket-grid">
-              {previews.map((preview, index) => (
-                <article
-                  key={`${preview.summary}-${preview.intent}`}
-                  className="ticket"
-                  style={{ animationDelay: `${40 + index * 60}ms` }}
-                >
-                  <div className="session-row" style={{ margin: 0 }}>
-                    <h3>
-                      <span className="ticket-num">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      {preview.summary}
-                    </h3>
-                    <span className="pill">{preview.intent}</span>
-                  </div>
-                  <div className="meta">
-                    <Icon name="flag" />
-                    {preview.projectKey}
-                    <span aria-hidden>·</span>
-                    <Icon name="verified" />
-                    {Math.round(preview.confidence * 100)}% ready
-                  </div>
-                  <pre>{preview.markdown}</pre>
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="refine-panel">
+                <div className="card-head" style={{ marginBottom: "0.75rem" }}>
+                  <h3 className="card-title">
+                    <Icon name="chat" />
+                    Ask for changes
+                  </h3>
+                </div>
+                <div className="refine-row">
+                  <select
+                    value={refineTarget === "all" ? "all" : String(refineTarget)}
+                    onChange={(e) =>
+                      setRefineTarget(
+                        e.target.value === "all" ? "all" : Number(e.target.value),
+                      )
+                    }
+                    aria-label="Which draft to refine"
+                  >
+                    <option value="all">All drafts</option>
+                    {previews.map((preview, index) => (
+                      <option key={`${preview.intent}-${index}`} value={index}>
+                        Ticket {index + 1}: {preview.summary.slice(0, 48)}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={refinePrompt}
+                    onChange={(e) => setRefinePrompt(e.target.value)}
+                    placeholder='e.g. “shorten the title”, “add another QA scenario”, “make the tone softer”'
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void refineWithChat();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !refinePrompt.trim()}
+                    onClick={() => void refineWithChat()}
+                  >
+                    <Icon name="auto_fix" />
+                    Revise
+                  </button>
+                </div>
+                {chatLog.length > 0 ? (
+                  <ul className="chat-log">
+                    {chatLog.map((entry, index) => (
+                      <li key={`${entry.role}-${index}`} data-role={entry.role}>
+                        <strong>{entry.role === "you" ? "You" : "Ticket Flow"}</strong>
+                        <span>{entry.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="hint">
+                    Edit any field below, or chat a change. Then copy sections into
+                    Jira yourself, or create one / all as you.
+                  </p>
+                )}
+                <div className="actions" style={{ marginTop: "0.85rem" }}>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void copyText(
+                        "all drafts",
+                        bulkPackMarkdown(previews.map((p) => p.draft)),
+                      )
+                    }
+                  >
+                    <Icon name="content_copy" />
+                    Copy all for paste
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn secondary ${busy && stage === "creating" ? "busy" : ""}`}
+                    disabled={busy || !signedIn}
+                    onClick={() => void createDrafts("all")}
+                  >
+                    <Icon name="publish" />
+                    Create all in Jira
+                  </button>
+                </div>
+              </div>
+
+              <div className="ticket-grid">
+                {previews.map((preview, index) => (
+                  <article
+                    key={`${preview.draft.intent}-${index}`}
+                    className="ticket ticket-edit"
+                    style={{ animationDelay: `${40 + index * 60}ms` }}
+                  >
+                    <div className="session-row" style={{ margin: 0 }}>
+                      <h3>
+                        <span className="ticket-num">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        Edit draft
+                      </h3>
+                      <span className="pill">{preview.intent}</span>
+                    </div>
+                    <label className="field">
+                      <span>Summary</span>
+                      <input
+                        value={preview.draft.summary}
+                        onChange={(e) =>
+                          updateDraft(index, { summary: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Product overview</span>
+                      <textarea
+                        rows={2}
+                        value={preview.draft.productOverview}
+                        onChange={(e) =>
+                          updateDraft(index, { productOverview: e.target.value })
+                        }
+                        style={{ minHeight: "4rem" }}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Description</span>
+                      <textarea
+                        rows={8}
+                        value={preview.draft.description}
+                        onChange={(e) =>
+                          updateDraft(index, { description: e.target.value })
+                        }
+                      />
+                    </label>
+                    <div className="meta">
+                      <Icon name="flag" />
+                      {preview.projectKey}
+                      <span aria-hidden>·</span>
+                      <Icon name="verified" />
+                      {Math.round(preview.confidence * 100)}% ready
+                    </div>
+                    <details className="ticket-preview">
+                      <summary>Full ticket preview</summary>
+                      <pre>{preview.markdown}</pre>
+                    </details>
+                    <div className="actions ticket-actions">
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() =>
+                          void copyText(
+                            "summary",
+                            draftSummaryForPaste(preview.draft),
+                          )
+                        }
+                      >
+                        <Icon name="title" />
+                        Copy summary
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() =>
+                          void copyText(
+                            "description",
+                            draftDescriptionForPaste(preview.draft),
+                          )
+                        }
+                      >
+                        <Icon name="content_copy" />
+                        Copy body
+                      </button>
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        disabled={busy || !signedIn}
+                        onClick={() => void createDrafts(index)}
+                      >
+                        <Icon name="publish" />
+                        Create this one
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="empty-hint">
               Drafts appear here after you run <strong>Research & draft</strong>.
+              Then edit by hand or chat changes before create / copy.
             </p>
           )}
         </section>

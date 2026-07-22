@@ -21,6 +21,10 @@
 | Multi-company accounts | **Ready** | Christie's + McLaren seeded; add more anytime |
 | Microsoft SSO login per company | **Ready (Path B)** | Sign in with Microsoft via Atlassian OAuth |
 | Create tickets once logged in | **Ready** | Create / bulk create / update by key |
+| Review + edit drafts | **Ready** | Edit summary / overview / description before create |
+| Chat back for changes | **Ready** | “Ask for changes” refine on one ticket or all |
+| Copy sections to paste in Jira | **Ready** | Copy summary, body, or all drafts |
+| Create one or batch | **Ready** | Create this one / Create all (confirm gated) |
 | Move status (e.g. In Analysis) | **Ready** | Uses only Jira-allowed transitions; Christie's defaults to post-create **In Analysis** |
 | Org-specific ticket format | **Ready to calibrate** | Template + per-company DoR/glossary/epics; you supply golden tickets to lock style |
 | Knowledge base of historical tickets | **Ready** | Grows automatically from search + your creates; per company |
